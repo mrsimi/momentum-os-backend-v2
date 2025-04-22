@@ -3,6 +3,7 @@ import resend
 from dotenv import load_dotenv
 
 load_dotenv()
+#
 
 class EmailInfra:
     def __init__(self):

@@ -53,7 +53,7 @@ class UserService:
                 db.add(db_user)
                 db.commit()
                 db.refresh(db_user)
-
+                self.send_verify_email(db_user.id, db_user.email)
                 
 
                 return BaseResponse(
