@@ -97,6 +97,12 @@ class UserService:
     def login(self, login_request: LoginRequest) -> BaseResponse[str]:
         with self.get_session() as db:
             user = self.get_user_by_email(login_request.email, db)
+            if user is None:
+                return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="User not found",
+                    data=None
+                )
             if user.is_verified == False:
                 self.send_verify_email(user.id, user.email)
                 return BaseResponse(

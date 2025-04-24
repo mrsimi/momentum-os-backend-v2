@@ -15,4 +15,4 @@ class UserModel(Base):
     date_updated = Column(DateTime, default=datetime.now(timezone.utc))
     last_login = Column(DateTime, default=datetime.now(timezone.utc))
     is_verified = Column(Boolean, default=False)
-    to_changePassword = Column(Boolean, nullable=True)
+    to_changepassword = Column(Boolean, nullable=True)
