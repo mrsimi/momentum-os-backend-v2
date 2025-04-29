@@ -13,7 +13,17 @@ class EmailInfra:
         file_path = f"app/infra/{type}.html"
         with open(file_path, "r") as file:
             html = file.read()
-        html = html.replace("{{ link }}", object["link"])
+        placeholders = {
+            "{{ link }}": object.get("link", ""),
+            "{{ creator_email }}": object.get("creator_email", ""),
+            "{{ accept_link }}": object.get("accept_link", ""),
+            "{{ reject_link }}": object.get("reject_link", ""),
+            "{{ project_name }}": object.get("project_name", ""),
+        }
+
+        for key, value in placeholders.items():
+            html = html.replace(key, value)
+
             
 
         params = {
@@ -25,6 +35,7 @@ class EmailInfra:
 
         try:
             email = resend.Emails.send(params)
+            print('email sent successfully', email)
             return email
         except Exception as e:
             print(f"Failed to send email: {e}")

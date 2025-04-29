@@ -97,3 +97,62 @@ def create_access_token(user_id: int) -> str:
         algorithm='HS256'
     )
     return token
+
+def encrypt_payload (payload: dict) -> str:
+    # Convert payload to string
+    payload_str = str(payload)
+    
+    # Generate a random salt
+    salt = generate_salt()
+    
+    # Create HMAC signature
+    signature = hmac.new(
+        os.getenv('JWT_SECRET_KEY').encode(),
+        payload_str.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    # Combine payload and signature
+    token_parts = {
+        'payload': payload,
+        'signature': signature,
+        'salt': salt
+    }
+    
+    # Encode the entire token
+    token = jwt.encode(
+        token_parts,
+        os.getenv('JWT_SECRET_KEY'),
+        algorithm='HS256'
+    )
+    
+    # URL-safe base64 encoding
+    return base64.urlsafe_b64encode(token.encode()).decode()
+
+def decrypt_payload(encrypted_payload: str) -> dict:
+    try:
+        # Decode base64
+        decoded_token = base64.urlsafe_b64decode(encrypted_payload.encode()).decode()
+        
+        # Decode JWT
+        token_parts = jwt.decode(
+            decoded_token,
+            os.getenv('JWT_SECRET_KEY'),
+            algorithms=['HS256']
+        )
+        
+        # Verify signature
+        expected_signature = hmac.new(
+            os.getenv('JWT_SECRET_KEY').encode(),
+            str(token_parts['payload']).encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        if token_parts['signature'] != expected_signature:
+            raise ValueError("Invalid signature")
+            
+        return token_parts['payload']
+    except Exception as e:
+        raise ValueError(f"Invalid token: {str(e)}")
+    
+    

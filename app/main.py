@@ -5,6 +5,7 @@ from app.api.api_router import api_router
 from dotenv import load_dotenv
 import os
 
+from app.api.endpoints import auth_endpoint, project_endpoint
 from app.middleware import ExceptionHandlerMiddleware
 load_dotenv()
 
@@ -27,4 +28,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(api_router, prefix=os.getenv("API_V1_STR"))
+#app.include_router(api_router, prefix=os.getenv("API_V1_STR"))
+
+app.include_router(auth_endpoint.router, prefix=os.getenv("API_V1_STR"))
+app.include_router(project_endpoint.router, prefix=os.getenv("API_V1_STR"))
