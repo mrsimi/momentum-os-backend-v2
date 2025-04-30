@@ -99,14 +99,14 @@ def create_access_token(user_id: int) -> str:
     )
     return token
 
-def decode_token(token: str) -> str:
+def decode_token(token: str):
     try:
         payload = jwt.decode(
             token,
             os.getenv('JWT_SECRET_KEY'),
             algorithms=['HS256']
         )
-        return payload['user_id']
+        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidTokenError:

@@ -11,13 +11,13 @@ from app.utils.auth_bearer import JWTBearer
 
 router = APIRouter(
     prefix="/projects",
-    tags=["projects"],
-    dependencies=[Depends(JWTBearer())]
+    tags=["projects"]
 )
 
 
 @router.post("", response_model=BaseResponse[str])
-def create_project(request: ProjectRequest, user_id: str = Query(...)):
+def create_project(request: ProjectRequest, payload: dict = Depends(JWTBearer())):
+    user_id = payload.get("user_id")
     project_service = ProjectService()
     response = project_service.create_project(request, user_id)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
@@ -29,7 +29,8 @@ def submit_project_invite_response(url:str =Query(...)):
     return JSONResponse(status_code=response.statusCode, content=response.dict())
 
 @router.get("", response_model=BaseResponse[list[ProjectResponse]])
-def get_projects_by_creator_id(user_id: int = Query(...)):
+def get_projects_by_creator_id(payload: dict = Depends(JWTBearer())):
+    user_id = payload.get("user_id")
     project_service = ProjectService()
     response = project_service.get_projects_by_creator_id(user_id)
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
