@@ -99,7 +99,7 @@ def create_access_token(user_id: int) -> str:
     )
     return token
 
-def get_current_user(token: str) -> str:
+def decode_token(token: str) -> str:
     try:
         payload = jwt.decode(
             token,

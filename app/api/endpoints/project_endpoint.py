@@ -1,17 +1,18 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer
 
 from app.schemas.project_schema import ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
 from app.services.project_service import ProjectService
 from fastapi.encoders import jsonable_encoder
 
-from app.utils.security import get_current_user
+from app.utils.auth_bearer import JWTBearer
 
 router = APIRouter(
     prefix="/projects",
     tags=["projects"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(JWTBearer())]
 )
 
 
