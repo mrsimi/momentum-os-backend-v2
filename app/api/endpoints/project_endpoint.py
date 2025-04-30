@@ -15,7 +15,7 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=BaseResponse[str])
+@router.post("", response_model=BaseResponse[str])
 def create_project(request: ProjectRequest, user_id: str = Query(...)):
     project_service = ProjectService()
     response = project_service.create_project(request, user_id)
@@ -27,7 +27,7 @@ def submit_project_invite_response(url:str =Query(...)):
     response = project_service.submit_project_invite_response(url)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
 
-@router.get("/", response_model=BaseResponse[list[ProjectResponse]])
+@router.get("", response_model=BaseResponse[list[ProjectResponse]])
 def get_projects_by_creator_id(user_id: int = Query(...)):
     project_service = ProjectService()
     response = project_service.get_projects_by_creator_id(user_id)
