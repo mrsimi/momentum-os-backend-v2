@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import bcrypt
+from fastapi import HTTPException
 import jwt
 import os
 from dotenv import load_dotenv
@@ -86,7 +87,7 @@ def decrypt_encrypted_user_id(encrypted_user_id: str) -> int:
 
 #create access token to expire in 24 hours
 def create_access_token(user_id: int) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(hours=24)
+    expire = datetime.now(timezone.utc) + timedelta(hours=48)
     payload = {
         'user_id': user_id,
         'exp': expire
@@ -97,6 +98,21 @@ def create_access_token(user_id: int) -> str:
         algorithm='HS256'
     )
     return token
+
+def get_current_user(token: str) -> str:
+    try:
+        payload = jwt.decode(
+            token,
+            os.getenv('JWT_SECRET_KEY'),
+            algorithms=['HS256']
+        )
+        return payload['user_id']
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+
 
 def encrypt_payload (payload: dict) -> str:
     # Convert payload to string

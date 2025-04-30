@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from app.schemas.project_schema import ProjectRequest, ProjectResponse
@@ -6,9 +6,12 @@ from app.schemas.response_schema import BaseResponse
 from app.services.project_service import ProjectService
 from fastapi.encoders import jsonable_encoder
 
+from app.utils.security import get_current_user
+
 router = APIRouter(
     prefix="/projects",
     tags=["projects"],
+    dependencies=[Depends(get_current_user)],
 )
 
 
