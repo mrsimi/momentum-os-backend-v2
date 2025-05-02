@@ -7,7 +7,7 @@ from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectMo
 from app.models.user_model import UserModel
 from app.schemas.project_schema import ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
-from app.utils.helpers import convert_time_utc_with_tz
+from app.utils.helpers import convert_time_utc_with_tz, convert_utc_days_and_time
 from psycopg2 import errors
 from sqlalchemy.exc import IntegrityError
 
@@ -37,7 +37,8 @@ class ProjectService:
         
         #verify they can create project or not based on subscription. 
         try:
-            checkin_time_utc = convert_time_utc_with_tz(project_request.checkin_time, 
+            checkin_days_utc, checkin_time_utc = convert_utc_days_and_time(project_request.checkin_days,
+                                                        project_request.checkin_time,
                                                         project_request.timezone)
             #members 
 
@@ -72,7 +73,8 @@ class ProjectService:
                     user_checkin_time=project_request.checkin_time,
                     user_checkin_days=project_request.checkin_days,
                     user_timezone=project_request.timezone,
-                    checkin_time_utc=checkin_time_utc
+                    checkin_time_utc=checkin_time_utc,
+                    checkin_days_utc = checkin_days_utc
                 )
 
                 db.add(checkin)

@@ -33,6 +33,7 @@ class CheckinModel(Base):
     date_updated = Column(DateTime, default=datetime.now(timezone.utc))
     last_run_time_utc = Column(Time, nullable=True)
     project_ended = Column(Boolean, default=False)
+    checkin_days_utc = Column(String)
 
 
 class ProjectMemberModel(Base):
