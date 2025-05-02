@@ -18,3 +18,15 @@ class ProjectResponse(BaseModel):
     start_date: date
     end_date: date
     state: str
+
+class ProjectDetailsResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    start_date: date
+    end_date: date
+    state: str
+    checkin_time: str #24 hour
+    checkin_days: list[str]
+    members_emails: list[EmailStr]
+    timezone: str

@@ -1,11 +1,11 @@
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import os
 from app.core.database import SessionLocal
 from app.infra.email_infra import EmailInfra
 from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.user_model import UserModel
-from app.schemas.project_schema import ProjectRequest, ProjectResponse
+from app.schemas.project_schema import ProjectDetailsResponse, ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
 from app.utils.helpers import convert_time_utc_with_tz, convert_utc_days_and_time
 from psycopg2 import errors
@@ -174,17 +174,17 @@ class ProjectService:
                 data= projects_response
             )
     
-    def get_project_status(self, project:ProjectModel):
+    def get_project_status(self, project: ProjectModel):
         return (
             'active' if project.is_active and not project.has_ended else
-            'ended' if project.is_active and project.has_ended else
-            'expired' if project.end_date.date() > datetime.date.today() else
+            'ended' if project.has_ended else
+            'expired' if project.end_date.date() < date.today() else
             'deactivated'
         )
     
-    def deactivate_project(self, project_id:int) -> BaseResponse[str]:
+    def deactivate_project(self, project_id:int, user_id:int) -> BaseResponse[str]:
         with self.get_session() as db:
-            project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+            project = db.query(ProjectModel).filter(ProjectModel.id == project_id and ProjectModel.creator_user_id == user_id).first()
             if not project:
                 return BaseResponse(
                     statusCode=status.HTTP_400_BAD_REQUEST,
@@ -202,6 +202,31 @@ class ProjectService:
             return BaseResponse(
                 statusCode=status.HTTP_200_OK,
                 message="Project deactivated successfully",
+                data=project_id
+            )
+    
+    def complete_project(self, project_id:int, user_id:int) -> BaseResponse[str]:
+        with self.get_session() as db:
+            project = db.query(ProjectModel).filter(ProjectModel.id == project_id and ProjectModel.creator_user_id == user_id).first()
+            if not project:
+                return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="Project not found",
+                    data=None
+                )
+            project.is_active = False
+            project.has_ended = True
+            project.date_updated = datetime.now(timezone.utc)
+
+            checkin = db.query(CheckinModel).filter(CheckinModel.project_id == project_id).first()
+            if checkin:
+                checkin.is_active = False
+                checkin.date_updated = datetime.now(timezone.utc)
+                
+            db.commit()
+            return BaseResponse(
+                statusCode=status.HTTP_200_OK,
+                message="Project completed successfully",
                 data=project_id
             )
     
@@ -301,4 +326,43 @@ class ProjectService:
                 statusCode=status.HTTP_200_OK,
                 message="Project rejected successfully",
                 data=project_id
+            )
+        
+    def get_project_details(self, project_id:int) -> BaseResponse[ProjectDetailsResponse]:
+        with self.get_session() as db:
+            project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+            if not project:
+                return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="Project not found",
+                    data=None
+                )
+            
+            project_response = ProjectResponse(
+                id=project.id,
+                title=project.title,
+                description=project.description,
+                start_date=project.start_date,
+                end_date=project.end_date,
+                state=self.get_project_status(project)
+            )
+            team_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == project_id).all()
+            checkin_details = db.query(CheckinModel).filter(CheckinModel.project_id == project_id).first()
+
+            project_response = ProjectDetailsResponse(
+                id=project.id,
+                title=project.title,
+                description=project.description,
+                start_date=project.start_date,
+                end_date=project.end_date,
+                state=self.get_project_status(project),
+                checkin_time=checkin_details.user_checkin_time.strftime("%H:%M"),
+                checkin_days=checkin_details.user_checkin_days.strip('{}').split(','),
+                members_emails = [member.user_email for member in team_members if not member.is_creator],
+                timezone=checkin_details.user_timezone
+            )
+            return BaseResponse(
+                statusCode=status.HTTP_200_OK,
+                message="Project found",
+                data=project_response
             )
