@@ -5,7 +5,7 @@ from app.core.database import SessionLocal
 from app.infra.email_infra import EmailInfra
 from app.models.project_model import CheckInResponseModel, CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.user_model import UserModel
-from app.schemas.project_schema import CheckInResponse, ProjectDetailsResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import CheckInResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
 from app.utils.helpers import convert_time_utc_with_tz, convert_utc_days_and_time
 from psycopg2 import errors
@@ -363,6 +363,14 @@ class ProjectService:
                     blockers=response.blocker
                 ) for response in checkin_responses
             ]
+
+            members = [
+                ProjectMemberResponse(
+                    id=member.id,
+                    user_email=member.user_email,
+                    is_creator=member.is_creator
+                ) for member in team_members
+            ]
             project_response = ProjectDetailsResponse(
                 id=project.id,
                 title=project.title,
@@ -372,7 +380,7 @@ class ProjectService:
                 state=self.get_project_status(project),
                 checkin_time=checkin_details.user_checkin_time.strftime("%H:%M"),
                 checkin_days=checkin_details.user_checkin_days.strip('{}').split(','),
-                members_emails = [member.user_email for member in team_members if not member.is_creator],
+                members= members,
                 timezone=checkin_details.user_timezone,
                 checkin_responses=checkin_response_details
             )

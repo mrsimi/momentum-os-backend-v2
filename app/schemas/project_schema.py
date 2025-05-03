@@ -28,9 +28,14 @@ class ProjectDetailsResponse(BaseModel):
     state: str
     checkin_time: str #24 hour
     checkin_days: list[str]
-    members_emails: list[EmailStr]
+    members: list['ProjectMemberResponse'] 
     timezone: str
-    checkin_responses: list['CheckInResponse'] = []
+    checkin_responses: list['CheckInResponse'] 
+
+class ProjectMemberResponse(BaseModel):
+    id: int
+    user_email: EmailStr
+    is_creator: bool
 
 class CheckInResponse(BaseModel):
     id: int
