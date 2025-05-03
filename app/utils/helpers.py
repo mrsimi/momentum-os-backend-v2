@@ -66,3 +66,18 @@ def convert_utc_days_and_time(days: List[str], time_str: str, tz: str) -> Tuple[
         utc_days.append(utc_day)
 
     return utc_days, utc_time
+
+def convert_datetime_to_timezone(dt: datetime, tz: str) -> datetime:
+    """
+    Convert a datetime object to the specified timezone.
+    
+    Args:
+        dt (datetime): The datetime object to convert.
+        tz (str): The timezone to use for conversion. Example: "+1", "-10"
+        
+    Returns:
+        datetime: The converted datetime object.
+    """
+    hours = int(tz)
+    local_tz = timezone(timedelta(hours=hours))
+    return dt.astimezone(local_tz)

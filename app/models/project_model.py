@@ -22,8 +22,6 @@ class CheckinModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, index=True)
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
     user_checkin_time = Column(Time)
     user_checkin_days = Column(String)
     user_timezone = Column(String)
@@ -51,3 +49,19 @@ class ProjectMemberModel(Base):
     user_email = Column(String, nullable=True)
     has_accepted = Column(Boolean, default=False)
     has_rejected = Column(Boolean, default=False)
+
+
+class CheckInResponseModel(Base):
+    __tablename__ = "checkin_responses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, index=True)
+    team_member_id = Column(Integer, index=True)
+    date_usertz = Column(DateTime)
+    date_utctz = Column(DateTime)
+    did_yesterday = Column(String)
+    doing_today = Column(String)
+    blocker = Column(String)
+    checkin_day = Column(String)
+    checkin_id = Column(Integer, index=True)
+

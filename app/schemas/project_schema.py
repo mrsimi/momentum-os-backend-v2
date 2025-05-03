@@ -30,3 +30,14 @@ class ProjectDetailsResponse(BaseModel):
     checkin_days: list[str]
     members_emails: list[EmailStr]
     timezone: str
+    checkin_responses: list['CheckInResponse'] = []
+
+class CheckInResponse(BaseModel):
+    id: int
+    project_id: int
+    team_member_id: int
+    date_usertz: date
+    date_utctz: date
+    did_yesterday: str
+    doing_today: str
+    blockers: str

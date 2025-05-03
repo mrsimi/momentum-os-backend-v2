@@ -1,11 +1,11 @@
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import os
 from app.core.database import SessionLocal
 from app.infra.email_infra import EmailInfra
-from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectModel
+from app.models.project_model import CheckInResponseModel, CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.user_model import UserModel
-from app.schemas.project_schema import ProjectDetailsResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import CheckInResponse, ProjectDetailsResponse, ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
 from app.utils.helpers import convert_time_utc_with_tz, convert_utc_days_and_time
 from psycopg2 import errors
@@ -68,8 +68,6 @@ class ProjectService:
 
                 checkin = CheckinModel(
                     project_id=project.id,
-                    start_date=project_request.start_date,
-                    end_date=project_request.end_date,
                     user_checkin_time=project_request.checkin_time,
                     user_checkin_days=project_request.checkin_days,
                     user_timezone=project_request.timezone,
@@ -328,9 +326,9 @@ class ProjectService:
                 data=project_id
             )
         
-    def get_project_details(self, project_id:int) -> BaseResponse[ProjectDetailsResponse]:
+    def get_project_details(self, project_id:int, creator_user_id:int) -> BaseResponse[ProjectDetailsResponse]:
         with self.get_session() as db:
-            project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+            project = db.query(ProjectModel).filter(ProjectModel.id == project_id and creator_user_id == creator_user_id).first()
             if not project:
                 return BaseResponse(
                     statusCode=status.HTTP_400_BAD_REQUEST,
@@ -349,6 +347,22 @@ class ProjectService:
             team_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == project_id).all()
             checkin_details = db.query(CheckinModel).filter(CheckinModel.project_id == project_id).first()
 
+            #get current time in UTC
+            date_usertz = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=int(checkin_details.user_timezone))))
+            checkin_responses = db.query(CheckInResponseModel).filter(CheckInResponseModel.project_id == project_id and date_usertz.date == date_usertz.date).all()
+
+            checkin_response_details = [
+                CheckInResponse(
+                    id=response.id,
+                    project_id=response.project_id,
+                    team_member_id=response.team_member_id,
+                    date_usertz=response.date_usertz,
+                    date_utctz=response.date_utctz,
+                    did_yesterday=response.did_yesterday,
+                    doing_today=response.doing_today,
+                    blockers=response.blocker
+                ) for response in checkin_responses
+            ]
             project_response = ProjectDetailsResponse(
                 id=project.id,
                 title=project.title,
@@ -359,7 +373,8 @@ class ProjectService:
                 checkin_time=checkin_details.user_checkin_time.strftime("%H:%M"),
                 checkin_days=checkin_details.user_checkin_days.strip('{}').split(','),
                 members_emails = [member.user_email for member in team_members if not member.is_creator],
-                timezone=checkin_details.user_timezone
+                timezone=checkin_details.user_timezone,
+                checkin_responses=checkin_response_details
             )
             return BaseResponse(
                 statusCode=status.HTTP_200_OK,

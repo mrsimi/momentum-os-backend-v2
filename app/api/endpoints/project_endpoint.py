@@ -38,7 +38,8 @@ def get_projects_by_creator_id(payload: dict = Depends(JWTBearer())):
 @router.get("/projects", response_model=BaseResponse[ProjectDetailsResponse])
 def get_project_by_id(project_id: int, payload: dict = Depends(JWTBearer())):
     project_service = ProjectService()
-    response = project_service.get_project_details(project_id)
+    user_id = payload.get("user_id")
+    response = project_service.get_project_details(project_id, user_id)
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
 
 @router.put("/deactivate", response_model=BaseResponse[str])
