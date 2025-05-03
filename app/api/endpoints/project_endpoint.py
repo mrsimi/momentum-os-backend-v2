@@ -35,7 +35,7 @@ def get_projects_by_creator_id(payload: dict = Depends(JWTBearer())):
     response = project_service.get_projects_by_creator_id(user_id)
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
 
-@router.get("/projects", response_model=BaseResponse[ProjectDetailsResponse])
+@router.get("", response_model=BaseResponse[ProjectDetailsResponse])
 def get_project_by_id(project_id: int, payload: dict = Depends(JWTBearer())):
     project_service = ProjectService()
     user_id = payload.get("user_id")
