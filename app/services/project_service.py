@@ -347,8 +347,19 @@ class ProjectService:
             team_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == project_id).all()
             checkin_details = db.query(CheckinModel).filter(CheckinModel.project_id == project_id).first()
 
-            #get current time in UTC
+            #get current time in UTC and convert it to user timezone
             date_usertz = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=int(checkin_details.user_timezone))))
+            should_have_checkin = False
+
+            checkin_days_utc = checkin_details.user_checkin_days.strip('{}').split(',')
+            current_day = date_usertz.strftime("%A")[0]  # Only the first letter of the current day
+
+            print(f"Current day: {current_day}")
+            print(f"Checkin days: {checkin_days_utc}")
+            if current_day in [day.strip()[0] for day in checkin_days_utc]:
+                should_have_checkin = True
+
+
             checkin_responses = db.query(CheckInResponseModel).filter(CheckInResponseModel.project_id == project_id and date_usertz.date == date_usertz.date).all()
 
             checkin_response_details = [
@@ -382,7 +393,8 @@ class ProjectService:
                 checkin_days=checkin_details.user_checkin_days.strip('{}').split(','),
                 members= members,
                 timezone=checkin_details.user_timezone,
-                checkin_responses=checkin_response_details
+                checkin_responses=checkin_response_details,
+                should_have_checkin = should_have_checkin
             )
             return BaseResponse(
                 statusCode=status.HTTP_200_OK,

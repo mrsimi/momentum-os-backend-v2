@@ -31,6 +31,7 @@ class ProjectDetailsResponse(BaseModel):
     members: list['ProjectMemberResponse'] 
     timezone: str
     checkin_responses: list['CheckInResponse'] 
+    should_have_checkin: bool
 
 class ProjectMemberResponse(BaseModel):
     id: int
