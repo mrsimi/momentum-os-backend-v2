@@ -151,9 +151,9 @@ class ProjectService:
             projects = db.query(ProjectModel).filter(ProjectModel.creator_user_id == user_id).all()
             if not projects:
                 return BaseResponse(
-                    statusCode=status.HTTP_400_BAD_REQUEST,
-                    message="Project not found",
-                    data=None
+                    statusCode=status.HTTP_200_OK,
+                    message="No Projects found",
+                    data=[]
                 )
             
             projects_response = [
@@ -354,8 +354,6 @@ class ProjectService:
             checkin_days_utc = checkin_details.user_checkin_days.strip('{}').split(',')
             current_day = date_usertz.strftime("%A")[0]  # Only the first letter of the current day
 
-            print(f"Current day: {current_day}")
-            print(f"Checkin days: {checkin_days_utc}")
             if current_day in [day.strip()[0] for day in checkin_days_utc]:
                 should_have_checkin = True
 
