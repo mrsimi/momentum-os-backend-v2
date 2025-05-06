@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Time
+from sqlalchemy import ARRAY, Boolean, Column, DateTime, Integer, String, Time
 from app.core.database import Base
 
 
@@ -23,7 +23,7 @@ class CheckinModel(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, index=True)
     user_checkin_time = Column(Time)
-    user_checkin_days = Column(String)
+    user_checkin_days = Column(ARRAY(String))
     user_timezone = Column(String)
     checkin_time_utc = Column(Time)
     is_active = Column(Boolean, default=True)
@@ -31,7 +31,7 @@ class CheckinModel(Base):
     date_updated = Column(DateTime, default=datetime.now(timezone.utc))
     last_run_time_utc = Column(Time, nullable=True)
     project_ended = Column(Boolean, default=False)
-    checkin_days_utc = Column(String)
+    checkin_days_utc = Column(ARRAY(String))
 
 
 class ProjectMemberModel(Base):

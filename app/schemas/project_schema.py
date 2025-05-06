@@ -37,6 +37,9 @@ class ProjectMemberResponse(BaseModel):
     id: int
     user_email: EmailStr
     is_creator: bool
+    has_accepted: bool
+    has_rejected: bool
+    is_guest: bool
 
 class CheckInResponse(BaseModel):
     id: int

@@ -351,11 +351,14 @@ class ProjectService:
             date_usertz = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=int(checkin_details.user_timezone))))
             should_have_checkin = False
 
-            checkin_days_utc = checkin_details.user_checkin_days.strip('{}').split(',')
-            current_day = date_usertz.strftime("%A")[0]  # Only the first letter of the current day
+            checkin_days_utc = checkin_details.user_checkin_days  # Already a list
+            current_day = date_usertz.strftime("%A")
 
-            if current_day in [day.strip()[0] for day in checkin_days_utc]:
-                should_have_checkin = True
+            should_have_checkin = current_day in checkin_days_utc
+
+            print(checkin_days_utc)
+            print(current_day)
+
 
 
             checkin_responses = db.query(CheckInResponseModel).filter(CheckInResponseModel.project_id == project_id and date_usertz.date == date_usertz.date).all()
@@ -377,7 +380,10 @@ class ProjectService:
                 ProjectMemberResponse(
                     id=member.id,
                     user_email=member.user_email,
-                    is_creator=member.is_creator
+                    is_creator=member.is_creator,
+                    has_accepted=member.has_accepted,
+                    has_rejected=member.has_rejected,
+                    is_guest=member.is_guest
                 ) for member in team_members
             ]
             project_response = ProjectDetailsResponse(
@@ -388,7 +394,7 @@ class ProjectService:
                 end_date=project.end_date,
                 state=self.get_project_status(project),
                 checkin_time=checkin_details.user_checkin_time.strftime("%H:%M"),
-                checkin_days=checkin_details.user_checkin_days.strip('{}').split(','),
+                checkin_days=checkin_details.user_checkin_days,
                 members= members,
                 timezone=checkin_details.user_timezone,
                 checkin_responses=checkin_response_details,
