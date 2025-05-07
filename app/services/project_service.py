@@ -5,10 +5,9 @@ from app.core.database import SessionLocal
 from app.infra.email_infra import EmailInfra
 from app.models.project_model import CheckInResponseModel, CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.user_model import UserModel
-from app.schemas.project_schema import CheckInResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import CheckInResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse, SubmitCheckInRequest
 from app.schemas.response_schema import BaseResponse
-from app.utils.helpers import convert_time_utc_with_tz, convert_utc_days_and_time
-from psycopg2 import errors
+from app.utils.helpers import convert_utc_days_and_time
 from sqlalchemy.exc import IntegrityError
 
 from fastapi import status
@@ -368,8 +367,8 @@ class ProjectService:
                     id=response.id,
                     project_id=response.project_id,
                     team_member_id=response.team_member_id,
-                    date_usertz=response.date_usertz,
-                    date_utctz=response.date_utctz,
+                    checkin_date_usertz=response.checkin_date_usertz,
+                    checkin_date_utctz=response.checkin_date_utctz,
                     did_yesterday=response.did_yesterday,
                     doing_today=response.doing_today,
                     blockers=response.blocker
@@ -406,3 +405,83 @@ class ProjectService:
                 message="Project found",
                 data=project_response
             )
+        
+
+    def submit_checkin(self, request:SubmitCheckInRequest) -> BaseResponse[str]:
+        try:
+
+            payload = decrypt_payload(request.payload)
+            with self.get_session() as db:
+                team_member = db.query(ProjectMemberModel).filter(ProjectMemberModel.user_email == payload['user_email']).first()
+                if not team_member:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="User with email not a team member of the project",
+                        data=None
+                    )
+                
+
+                response = CheckInResponseModel(
+                    project_id = request.project_id,
+                    team_member_id = team_member.id,
+                    checkin_date_usertz = payload['user_datetime'],
+                    did_yesterday = request.did_yesterday,
+                    doing_today = request.doing_today,
+                    blocker = request.blockers,
+                    checkin_day = payload['user_checkinday'],
+                    date_created_utc = datetime.now(timezone.utc),
+                    checkin_id = payload['checkin_id']
+                )
+
+                
+                db.add(response)
+                db.commit()
+
+                return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Response recorded successfully",
+                        data=None
+                    )
+
+            
+        except Exception as e:
+            print(f'Error while recording response {e}')
+            return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Error while trying to save your response",
+                        data=None
+                    )
+        
+
+    def get_projects_by_public(self, project_id:int):
+        try:
+            with self.get_session() as db:
+                project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+                if not project:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Project not found",
+                        data=None
+                    )
+
+                response_data = ProjectResponse(
+                    id=project.id,
+                    title=project.title,
+                    description=project.description,
+                    start_date=project.start_date,
+                    end_date=project.end_date,
+                    state= self.get_project_status(project)
+                )
+
+                return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="success",
+                        data=response_data
+                    )
+        except Exception as e:
+            print(f'Error while get_projects_by_public response {e}')
+            return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Error while trying to get project",
+                        data=None
+                    )

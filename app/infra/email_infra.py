@@ -25,12 +25,16 @@ class EmailInfra:
             html = html.replace(key, value)
 
             
-
+        container_path = f"app/infra/container.html"
+        with open(container_path, "r") as file:
+            container_html = file.read()
+        
+        full_content = container_html.replace("{{content}}", html)
         params = {
             "from": "Momentum OS <home@turntablecharts.com>",
             "to": destinationEmail,
             "subject": subject,
-            "html": html
+            "html": full_content
         }
 
         try:

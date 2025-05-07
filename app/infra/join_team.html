@@ -1,80 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #f5f7fa;
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      background: #fff;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-    .header {
-      background-color: #1f5da3;
-      color: #fff;
-      padding: 24px;
-      text-align: center;
-    }
-    .content {
-      padding: 24px;
-    }
-    .content h2 {
-      margin-top: 0;
-    }
-    .button {
-      display: inline-block;
-      padding: 12px 24px;
-      margin: 12px 8px;
-      color: #fff;
-      background-color: #1f5da3;
-      text-decoration: none;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-    .button.reject {
-      background-color: #d9534f;
-    }
-    .footer {
-      font-size: 12px;
-      color: #999;
-      text-align: center;
-      padding: 16px;
-      background-color: #f0f0f0;
-    }
-    a{
-      text-decoration: none ;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Project Invitation</h1>
-    </div>
-    <div class="content">
-      <h2>You're invited to join <strong>{{ project_name }}</strong></h2>
-      <p><strong>{{ creator_email }}</strong> has invited you to collaborate on the project.</p>
-      <p>To respond to the invitation, choose one of the options below:</p>
-      <p style="text-align: center;">
-        <a href="{{ accept_link }}" class="button">Accept</a>
-        <a href="{{ reject_link }}" class="button reject">Reject</a>
-      </p>
-      <p>If you didn’t request this, feel free to ignore this email.</p>
-      <p>— The Momentum OS Team</p>
-    </div>
-    <div class="footer">
-      <p>This is an automated message — please do not reply.</p>
-      <p>&copy; 2025 Momentum OS. All rights reserved.</p>
-    </div>
+<div class="container">
+  <div class="header">
+    <h1>Project Invitation</h1>
   </div>
-</body>
-</html>
+  <div class="content">
+    <h2>You're invited to join <strong>{{ project_name }}</strong></h2>
+    <p><strong>{{ creator_email }}</strong> has invited you to collaborate on the project.</p>
+    <p>To respond to the invitation, choose one of the options below:</p>
+    <p style="text-align: center;">
+      <a href="{{ accept_link }}">Accept</a> <br> <br>
+      <a href="{{ reject_link }}">Reject</a>
+    </p>
+    <p>If you didn’t request this, feel free to ignore this email.</p>
+    <p>— The Momentum OS Team</p>
+  </div>
+  <div class="footer">
+    <p>This is an automated message — please do not reply.</p>
+    <p>&copy; 2025 Momentum OS. All rights reserved.</p>
+  </div>
+</div>

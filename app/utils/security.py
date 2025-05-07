@@ -166,7 +166,7 @@ def decrypt_payload(encrypted_payload: str) -> dict:
         
         if token_parts['signature'] != expected_signature:
             raise ValueError("Invalid signature")
-            
+        
         return token_parts['payload']
     except Exception as e:
         raise ValueError(f"Invalid token: {str(e)}")

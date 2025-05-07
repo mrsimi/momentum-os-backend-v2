@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 
-from app.schemas.project_schema import ProjectDetailsResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import ProjectDetailsResponse, ProjectRequest, ProjectResponse, SubmitCheckInRequest
 from app.schemas.response_schema import BaseResponse
 from app.services.project_service import ProjectService
 from fastapi.encoders import jsonable_encoder
 
 from app.utils.auth_bearer import JWTBearer
+from app.utils.security import decrypt_payload
 
 router = APIRouter(
     prefix="/projects",
@@ -42,6 +43,12 @@ def get_project_by_id(project_id: int, payload: dict = Depends(JWTBearer())):
     response = project_service.get_project_details(project_id, user_id)
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
 
+@router.get("/public/{project_id}", response_model=BaseResponse[ProjectResponse])
+def get_project_by_id(project_id: int):
+    project_service = ProjectService()
+    response = project_service.get_projects_by_public(project_id)
+    return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
+
 @router.put("/deactivate", response_model=BaseResponse[str])
 def deactivate_project(project_id: int, payload: dict = Depends(JWTBearer())):
     user_id = payload.get("user_id")
@@ -54,4 +61,11 @@ def deactivate_project(project_id: int, payload: dict = Depends(JWTBearer())):
     user_id = payload.get("user_id")
     project_service = ProjectService()
     response = project_service.complete_project(project_id, user_id)
+    return JSONResponse(status_code=response.statusCode, content=response.dict())
+
+
+@router.post('/submit-checkin', response_model=BaseResponse[str])
+def submit_checkin(request:SubmitCheckInRequest):
+    project_service = ProjectService()
+    response = project_service.submit_checkin(request)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
