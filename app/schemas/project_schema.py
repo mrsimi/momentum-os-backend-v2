@@ -40,6 +40,7 @@ class ProjectMemberResponse(BaseModel):
     has_accepted: bool
     has_rejected: bool
     is_guest: bool
+    is_active: bool
 
 class CheckInResponse(BaseModel):
     id: int

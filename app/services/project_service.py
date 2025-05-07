@@ -383,7 +383,8 @@ class ProjectService:
                     is_creator=member.is_creator,
                     has_accepted=member.has_accepted,
                     has_rejected=member.has_rejected,
-                    is_guest=member.is_guest
+                    is_guest=member.is_guest,
+                    is_active=member.is_active
                 ) for member in team_members
             ]
             project_response = ProjectDetailsResponse(
