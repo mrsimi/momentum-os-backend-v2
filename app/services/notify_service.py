@@ -69,6 +69,13 @@ async def fetch_checkins_and_notify():
             link = f"{FRONTEND_URL}/check-in?project_id={project_id}&payload={encrypted_payload}"
 
             print(f'-- found member and link: {link}')
-            #await email_infra.send_email(user_email, "Submit Your CheckIn", "submit_checkin", {"link": link})
+            await email_infra.send_email(user_email, "Submit Your CheckIn", "submit_checkin", {"link": link})
+
+        insert_tracker_query = """
+            insert into checkin_response_tracker
+            (status, number_of_responses_expecting, user_checkin_date, checkin_id, date_created)
+            values ($1, $2, $3, $4, $5)
+            """
+        await conn.execute(insert_tracker_query, 'EMAILS_SENT', len(members), user_datetime, checkin_id, datetime.now(timezone.utc))
 
     await conn.close()

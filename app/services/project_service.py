@@ -1,11 +1,15 @@
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 import os
+from sqlalchemy.sql import func
 from app.core.database import SessionLocal
+
 from app.infra.email_infra import EmailInfra
-from app.models.project_model import CheckInResponseModel, CheckinModel, ProjectMemberModel, ProjectModel
+from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectModel
+from app.models.response_model import CheckInResponseModel
 from app.models.user_model import UserModel
-from app.schemas.project_schema import CheckInResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse, SubmitCheckInRequest
+from app.schemas.checkin_response_schema import CheckInResponse
+from app.schemas.project_schema import ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
 from app.utils.helpers import convert_utc_days_and_time
 from sqlalchemy.exc import IntegrityError
@@ -360,7 +364,8 @@ class ProjectService:
 
 
 
-            checkin_responses = db.query(CheckInResponseModel).filter(CheckInResponseModel.project_id == project_id and date_usertz.date == date_usertz.date).all()
+            checkin_responses = db.query(CheckInResponseModel).filter(CheckInResponseModel.project_id == project_id, 
+                                                                      func.date(CheckInResponseModel.checkin_date_usertz) == date_usertz.date).all()
 
             checkin_response_details = [
                 CheckInResponse(
@@ -405,54 +410,7 @@ class ProjectService:
                 message="Project found",
                 data=project_response
             )
-        
-
-    def submit_checkin(self, request:SubmitCheckInRequest) -> BaseResponse[str]:
-        try:
-
-            payload = decrypt_payload(request.payload)
-            with self.get_session() as db:
-                team_member = db.query(ProjectMemberModel).filter(ProjectMemberModel.user_email == payload['user_email']).first()
-                if not team_member:
-                    return BaseResponse(
-                        statusCode=status.HTTP_400_BAD_REQUEST,
-                        message="User with email not a team member of the project",
-                        data=None
-                    )
-                
-
-                response = CheckInResponseModel(
-                    project_id = request.project_id,
-                    team_member_id = team_member.id,
-                    checkin_date_usertz = payload['user_datetime'],
-                    did_yesterday = request.did_yesterday,
-                    doing_today = request.doing_today,
-                    blocker = request.blockers,
-                    checkin_day = payload['user_checkinday'],
-                    date_created_utc = datetime.now(timezone.utc),
-                    checkin_id = payload['checkin_id']
-                )
-
-                
-                db.add(response)
-                db.commit()
-
-                return BaseResponse(
-                        statusCode=status.HTTP_200_OK,
-                        message="Response recorded successfully",
-                        data=None
-                    )
-
-            
-        except Exception as e:
-            print(f'Error while recording response {e}')
-            return BaseResponse(
-                        statusCode=status.HTTP_400_BAD_REQUEST,
-                        message="Error while trying to save your response",
-                        data=None
-                    )
-        
-
+    
     def get_projects_by_public(self, project_id:int):
         try:
             with self.get_session() as db:
