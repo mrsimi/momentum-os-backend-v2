@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import logging
 
 from sqlalchemy import func
 from app.core.database import SessionLocal
@@ -11,6 +12,10 @@ from app.schemas.response_schema import BaseResponse
 from app.utils.security import decrypt_payload
 
 from fastapi import status
+logging.basicConfig(
+    format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+    level=logging.INFO
+)
 
 class ResponseService:
     def __init__(self):
@@ -101,7 +106,7 @@ class ResponseService:
 
             
         except Exception as e:
-            print(f'Error while recording response {e}')
+            logging.info(f'Error while recording response {e}')
             return BaseResponse(
                         statusCode=status.HTTP_400_BAD_REQUEST,
                         message="Error while trying to save your response",

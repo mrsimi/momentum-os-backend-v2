@@ -1,10 +1,14 @@
+import logging
 import os
 import resend
 from dotenv import load_dotenv
 
 load_dotenv()
 #
-
+logging.basicConfig(
+    format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+    level=logging.INFO
+)
 class EmailInfra:
     def __init__(self):
         resend.api_key = os.getenv("RESEND_API_KEY")
@@ -39,8 +43,8 @@ class EmailInfra:
 
         try:
             email = resend.Emails.send(params)
-            print('email sent successfully', email)
+            logging.info('email sent successfully', email)
             return email
         except Exception as e:
-            print(f"Failed to send email: {e}")
+            logging.info(f"Failed to send email: {e}")
             return None

@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
+import logging
 import os
 from sqlalchemy.sql import func
 from app.core.database import SessionLocal
@@ -17,6 +18,11 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import status
 
 from app.utils.security import decrypt_payload, encrypt_payload
+
+logging.basicConfig(
+    format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+    level=logging.INFO
+)
 
 class ProjectService:
     def __init__(self):
@@ -141,7 +147,7 @@ class ProjectService:
                 )
 
         except Exception as e:
-            print(f"Error creating project: {e}")
+            logging.info(f"Error creating project: {e}")
             return BaseResponse(
                 statusCode=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 message="Internal server error",
@@ -359,8 +365,8 @@ class ProjectService:
 
             should_have_checkin = current_day in checkin_days_utc
 
-            print(checkin_days_utc)
-            print(current_day)
+            logging.info(checkin_days_utc)
+            logging.info(current_day)
 
 
 
@@ -437,7 +443,7 @@ class ProjectService:
                         data=response_data
                     )
         except Exception as e:
-            print(f'Error while get_projects_by_public response {e}')
+            logging.info(f'Error while get_projects_by_public response {e}')
             return BaseResponse(
                         statusCode=status.HTTP_400_BAD_REQUEST,
                         message="Error while trying to get project",

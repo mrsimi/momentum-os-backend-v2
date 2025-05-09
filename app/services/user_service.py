@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from sqlalchemy.orm import Session
 from app.models.user_model import UserModel
 from app.core.database import SessionLocal
@@ -13,6 +14,10 @@ from app.infra.email_infra import EmailInfra
 from fastapi import status
 
 import os
+logging.basicConfig(
+    format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+    level=logging.INFO
+)
 
 class UserService:
     def __init__(self):
@@ -87,7 +92,7 @@ class UserService:
                         data=None
                     )
         except Exception as e:
-            print(e)
+            logging.info(e)
             return BaseResponse(
                 statusCode=status.HTTP_400_BAD_REQUEST,
                 message="Invalid token",

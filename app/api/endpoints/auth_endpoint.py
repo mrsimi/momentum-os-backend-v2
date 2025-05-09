@@ -4,10 +4,13 @@ from app.schemas.response_schema import BaseResponse
 from app.services import UserService
 from fastapi.responses import JSONResponse
 
+from app.utils.logged_route import LoggedRoute
+
 router = APIRouter(
     prefix="/auth",
     tags=["auth"],
 )
+router.route_class = LoggedRoute
 
 @router.post("/register", response_model=BaseResponse[str])
 async def register(request: RegisterRequest):

@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -10,6 +11,11 @@ from app.api.endpoints import auth_endpoint, checkin_response_endpoint, project_
 from app.services.notify_service import fetch_checkins_and_notify
 load_dotenv()
 
+logging.basicConfig(
+    format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+    level=logging.INFO
+)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async def runner():
@@ -17,12 +23,12 @@ async def lifespan(app: FastAPI):
         now = datetime.now(timezone.utc)
         next_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
         wait_seconds = (next_hour - now).total_seconds()
-        print(f"Sleeping for {int(wait_seconds)}s to align to next hour at {next_hour.isoformat()} UTC")
+        logging.info(f"Sleeping for {int(wait_seconds)}s to align to next hour at {next_hour.isoformat()} UTC")
         await asyncio.sleep(wait_seconds)
 
         # Then run every hour exactly on the hour
         while True:
-            print(f"Running check-in task at {datetime.now(timezone.utc).isoformat()} UTC")
+            logging.info(f"Running check-in task at {datetime.now(timezone.utc).isoformat()} UTC")
             await fetch_checkins_and_notify()
             await asyncio.sleep(3600)  # wait for the next hour
 
@@ -33,13 +39,14 @@ async def lifespan(app: FastAPI):
     try:
         await task
     except asyncio.CancelledError:
-        print("Background task cancelled during shutdown.")
+        logging.info("Background task cancelled during shutdown.")
 
 app = FastAPI(
     title=os.getenv("PROJECT_NAME"),
     openapi_url=f"{os.getenv('API_V1_STR')}/openapi.json",
     lifespan=lifespan
 )
+
 
 
 #app.add_middleware(ExceptionHandlerMiddleware)

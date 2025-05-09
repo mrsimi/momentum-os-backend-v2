@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import logging
 from app.infra.email_infra import EmailInfra
 import os 
 from dotenv import load_dotenv
@@ -6,6 +7,11 @@ import asyncpg
 
 from app.utils.security import encrypt_payload
 load_dotenv()
+
+logging.basicConfig(
+    format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
+    level=logging.INFO
+)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 FRONTEND_URL = os.getenv('FRONTEND_URL')
@@ -28,13 +34,13 @@ async def fetch_checkins_and_notify():
             AND $2 = ANY(c.checkin_days_utc)
     """
 
-    print(checkin_query, current_hour, current_day)
+    logging.info(checkin_query, current_hour, current_day)
 
     checkins = await conn.fetch(checkin_query, current_hour, current_day)
     
 
-    print(f'-- found {len(checkins)} notifications')
-    print(checkins)
+    logging.info(f'-- found {len(checkins)} notifications')
+    logging.info(checkins)
 
     for row in checkins:
         email_infra = EmailInfra()
@@ -53,7 +59,7 @@ async def fetch_checkins_and_notify():
             AND is_active = true
         """
         members = await conn.fetch(members_query, project_id)
-        print(f'-- found {len(members)} members for project_id: {project_id}')
+        logging.info(f'-- found {len(members)} members for project_id: {project_id}')
 
         for member in members:
             user_email = member["user_email"]
@@ -64,11 +70,11 @@ async def fetch_checkins_and_notify():
                     "user_timezone": user_timezone,
                     "checkin_id": checkin_id
             }
-            print(payload)
+            logging.info(payload)
             encrypted_payload = encrypt_payload(payload)
             link = f"{FRONTEND_URL}/check-in?project_id={project_id}&payload={encrypted_payload}"
 
-            print(f'-- found member and link: {link}')
+            logging.info(f'-- found member and link: {link}')
             await email_infra.send_email(user_email, "Submit Your CheckIn", "submit_checkin", {"link": link})
 
         insert_tracker_query = """
