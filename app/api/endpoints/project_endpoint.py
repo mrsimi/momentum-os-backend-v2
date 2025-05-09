@@ -7,12 +7,14 @@ from app.services.project_service import ProjectService
 from fastapi.encoders import jsonable_encoder
 
 from app.utils.auth_bearer import JWTBearer
+from app.utils.logged_route import LoggedRoute
 
 router = APIRouter(
     prefix="/projects",
     tags=["projects"]
 )
 
+router.route_class = LoggedRoute
 
 @router.post("", response_model=BaseResponse[str])
 def create_project(request: ProjectRequest, payload: dict = Depends(JWTBearer())):
