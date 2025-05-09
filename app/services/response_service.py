@@ -44,7 +44,7 @@ class ResponseService:
                     )
                 
                 checkin_tracker = db.query(CheckInResponseTracker).filter(CheckInResponseTracker.checkin_id == payload['checkin_id'],
-                                                                          func.date(CheckInResponseTracker.user_checkin_date) == datetime.fromisoformat(payload['user_datetime']).date).first()
+                                                                          func.date(CheckInResponseTracker.user_checkin_date) == datetime.fromisoformat(payload['user_datetime']).date()).first()
                 if not checkin_tracker:
                     return BaseResponse(
                         statusCode=status.HTTP_400_BAD_REQUEST,
@@ -60,7 +60,7 @@ class ResponseService:
                     )
                 
                 submitted_response = db.query(CheckInResponseModel).filter(CheckInResponseModel.checkin_id == payload['checkin_id'],
-                                                                            func.date(CheckInResponseModel.checkin_date_usertz) == datetime.fromisoformat(payload['user_datetime']).date,
+                                                                            func.date(CheckInResponseModel.checkin_date_usertz) == datetime.fromisoformat(payload['user_datetime']).date(),
                                                                             CheckInResponseModel.team_member_id == team_member.id).first()
                 if submitted_response:
                     return BaseResponse(

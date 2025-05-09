@@ -365,7 +365,7 @@ class ProjectService:
 
 
             checkin_responses = db.query(CheckInResponseModel).filter(CheckInResponseModel.project_id == project_id, 
-                                                                      func.date(CheckInResponseModel.checkin_date_usertz) == date_usertz.date).all()
+                                                                      func.date(CheckInResponseModel.checkin_date_usertz) == date_usertz.date()).all()
 
             checkin_response_details = [
                 CheckInResponse(

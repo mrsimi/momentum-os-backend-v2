@@ -42,10 +42,9 @@ app = FastAPI(
 
 
 #app.add_middleware(ExceptionHandlerMiddleware)
-origins = [
-    "http://localhost:8080",  # your Vite/React dev server
-    "https://momentum-os.vercel.app",  # if your frontend is hosted here
-]
+
+origins = os.getenv("ALLOWED_ORIGINS", "")
+allowed_origins = [origin.strip() for origin in origins.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
