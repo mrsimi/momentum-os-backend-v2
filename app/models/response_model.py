@@ -1,6 +1,6 @@
 
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import ARRAY, Boolean, Column, DateTime, Integer, String
 from app.core.database import Base
 
 
@@ -30,5 +30,21 @@ class CheckInResponseTracker(Base):
     user_checkin_date = Column(DateTime)
     checkin_id = Column(Integer)
     date_created=Column(DateTime)
+
+class CheckInAnalyticsModel(Base):
+    __tablename__ = "checkin_analytics"
+
+    id = Column(Integer, primary_key=True)
+    summary=Column(String)
+    user_checkin_date=Column(DateTime)
+    project_id = Column(Integer)
+    checkin_id = Column(Integer, index=True)
+    checkin_responseIds = Column(ARRAY(Integer))
+    date_created=Column(DateTime)
+    blockers_summary=Column(String)
+    responses_corr_with_project_description=Column(String)
+    diversion=Column(String)
+
+
 
 
