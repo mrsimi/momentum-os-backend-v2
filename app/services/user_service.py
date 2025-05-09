@@ -207,7 +207,7 @@ class UserService:
         # send email verification
         email_infra.send_email(
             destinationEmail=email,
-            subject="Momentum OS Verify your email",
+            subject="Rava Verify your email",
             type="verify_email",
             object={
                 "link": f"{os.getenv('FRONTEND_URL')}/click?upnv={verify_email_link}"
@@ -218,7 +218,7 @@ class UserService:
         email_infra = EmailInfra()
         email_infra.send_email(
             destinationEmail=email,
-            subject="Momentum OS Reset your password",
+            subject="Rava Reset your password",
             type="reset_password",
             object={
                 "link": f"{os.getenv('FRONTEND_URL')}/click?upnp={reset_password_link}"

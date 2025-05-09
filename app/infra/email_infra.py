@@ -31,7 +31,7 @@ class EmailInfra:
         
         full_content = container_html.replace("{{content}}", html)
         params = {
-            "from": "Momentum OS <home@turntablecharts.com>",
+            "from": "Rava <home@turntablecharts.com>",
             "to": destinationEmail,
             "subject": subject,
             "html": full_content
