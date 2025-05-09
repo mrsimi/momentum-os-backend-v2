@@ -37,7 +37,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=os.getenv("PROJECT_NAME"),
-    openapi_url=f"{os.getenv('API_V1_STR')}/openapi.json"
+    openapi_url=f"{os.getenv('API_V1_STR')}/openapi.json",
+    lifespan=lifespan
 )
 
 
