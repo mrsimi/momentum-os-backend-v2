@@ -46,6 +46,7 @@ class ProjectService:
         
         #verify they can create project or not based on subscription. 
         try:
+            project_request.members_emails = [email.lower().strip() for email in project_request.members_emails]
             checkin_days_utc, checkin_time_utc = convert_utc_days_and_time(project_request.checkin_days,
                                                         project_request.checkin_time,
                                                         project_request.timezone)

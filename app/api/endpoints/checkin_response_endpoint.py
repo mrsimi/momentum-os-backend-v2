@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from datetime import date
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
-from app.schemas.checkin_response_schema import SubmitCheckInRequest
+from app.schemas.checkin_response_schema import CheckInAnalyticsResponse, SubmitCheckInRequest
 from app.schemas.response_schema import BaseResponse
 from app.services.response_service import ResponseService
 from app.utils.logged_route import LoggedRoute
@@ -13,7 +14,13 @@ router = APIRouter(
 router.route_class = LoggedRoute
 
 @router.post('/', response_model=BaseResponse[str])
-async def submit_checkin(request:SubmitCheckInRequest):
+def submit_checkin(request:SubmitCheckInRequest):
     project_service = ResponseService()
-    response = await project_service.submit_checkin(request)
+    response = project_service.submit_checkin(request)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
+
+
+@router.get('/', response_model=BaseResponse[CheckInAnalyticsResponse])
+def get_check_analytics(project_id:int=Query(...), checkin_date:date=Query(...)):
+    project_service = ResponseService()
+    response = project_service.submit_checkin(project_id, checkin_date)

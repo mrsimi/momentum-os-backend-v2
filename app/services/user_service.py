@@ -1,13 +1,16 @@
 from datetime import datetime, timezone
 import logging
+import httpx
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from app.models.project_model import ProjectMemberModel
 from app.models.user_model import UserModel
 from app.core.database import SessionLocal
 from typing import Optional
 from contextlib import contextmanager
 from app.utils.security import check_password, create_access_token, generate_encrypted_user_id, hash_password, decrypt_encrypted_user_id
 
-from app.schemas.auth_schema import LoginRequest, RegisterRequest
+from app.schemas.auth_schema import GoogleLoginRequest, LoginRequest, RegisterRequest
 from app.schemas.response_schema import BaseResponse
 from app.infra.email_infra import EmailInfra
 
@@ -58,8 +61,8 @@ class UserService:
                 db.add(db_user)
                 db.commit()
                 db.refresh(db_user)
+                self.completed_user_profile_in_team_members(db_user.email, db, db_user.id)
                 self.send_verify_email(db_user.id, db_user.email)
-                
 
                 return BaseResponse(
                     statusCode=status.HTTP_200_OK,
@@ -100,44 +103,60 @@ class UserService:
             )
     
     def login(self, login_request: LoginRequest) -> BaseResponse[str]:
-        with self.get_session() as db:
-            user = self.get_user_by_email(login_request.email, db)
-            if user is None:
-                return BaseResponse(
-                    statusCode=status.HTTP_400_BAD_REQUEST,
-                    message="User not found",
-                    data=None
-                )
-            if user.is_verified == False:
-                self.send_verify_email(user.id, user.email)
-                return BaseResponse(
-                    statusCode=status.HTTP_400_BAD_REQUEST,
-                    message="Email not verified, kindly click on the link in your email to verify your account",
-                    data=None
-                )
-            if user:
-                if check_password(login_request.password.strip(), user.hashed_password):
-                    access_token = create_access_token(user.id)
-                    user.last_login = datetime.now(timezone.utc)
-                    db.commit()
-                    db.refresh(user)
+        try:
+            with self.get_session() as db:
+                user = self.get_user_by_email(login_request.email, db)
+                if user is None:
                     return BaseResponse(
-                        statusCode=status.HTTP_200_OK,
-                        message="Login successful",
-                        data= { "user_id": user.id, "access_token": access_token }
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="User not found",
+                        data=None
                     )
+                
+                if user.is_verified == False:
+                    self.send_verify_email(user.id, user.email)
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Email not verified, kindly click on the link in your email to verify your account",
+                        data=None
+                    )
+                
+                if not user.hashed_password:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Invalid login, kindly use google login",
+                        data=None
+                    )
+                if user:
+                    if check_password(login_request.password.strip(), user.hashed_password):
+                        access_token = create_access_token(user.id)
+                        user.last_login = datetime.now(timezone.utc)
+                        db.commit()
+                        db.refresh(user)
+                        return BaseResponse(
+                            statusCode=status.HTTP_200_OK,
+                            message="Login successful",
+                            data= { "user_id": user.id, "access_token": access_token }
+                        )
+                    else:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="Invalid password",
+                            data=None
+                        )
                 else:
                     return BaseResponse(
                         statusCode=status.HTTP_400_BAD_REQUEST,
-                        message="Invalid password",
+                        message="User not found",
                         data=None
                     )
-            else:
-                return BaseResponse(
-                    statusCode=status.HTTP_400_BAD_REQUEST,
-                    message="User not found",
-                    data=None
-                )
+        except Exception as e:
+            logging.error('Error on login', e)
+            return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="An error occured while trying to login",
+                            data=None
+                        )
     
     def forgot_password(self, email: str) -> BaseResponse[str]:
         with self.get_session() as db:
@@ -229,3 +248,88 @@ class UserService:
                 "link": f"{os.getenv('FRONTEND_URL')}/click?upnp={reset_password_link}"
             }
         )
+
+    def google_auth(self, request:GoogleLoginRequest):
+        try:
+            with httpx.Client() as client:
+                response = client.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {request.token}"}
+                )
+
+                if response.status_code != 200:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Could not verify google sign in",
+                        data=None
+                    )
+
+            user_info = response.json()
+            email = user_info['email']
+            externalsignup_id = user_info['sub']
+
+            with self.get_session() as db:
+                user = db.query(UserModel).filter(
+                        or_(
+                            UserModel.email == email.lower().strip(),
+                            UserModel.externalsignup_id == externalsignup_id
+                        )
+                    ).first()
+
+                
+                if not user:
+                    #register user
+                    db_user = UserModel(
+                        email=email.lower().strip(),
+                        is_active=True,
+                        is_guest=False,
+                        is_verified = True,
+                        externalsignup_id = externalsignup_id,
+                        externalsignupprovider = 'GOOGLE'
+                    )
+                    db.add(db_user)
+                    db.commit()
+                    db.refresh(db_user)
+
+                    self.completed_user_profile_in_team_members(db_user.email, db, db_user.id)
+                    res_access_token = create_access_token(db_user.id)
+
+                    return BaseResponse(
+                            statusCode=status.HTTP_200_OK,
+                            message="Login successful",
+                            data= { "user_id": db_user.id, "access_token": res_access_token }
+                        )
+                else:
+                    if user.hashed_password:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="Kindy continue with your email and password",
+                            data=None
+                        )
+                    if user.externalsignup_id:
+                        #sign in user
+                        access_token = create_access_token(user.id)
+                        user.last_login = datetime.now(timezone.utc)
+                        db.commit()
+                        db.refresh(user)
+                        return BaseResponse(
+                            statusCode=status.HTTP_200_OK,
+                            message="Login successful",
+                            data= { "user_id": user.id, "access_token": access_token }
+                        )
+                
+            
+        except Exception as e:
+            logging.error('Error on signin with google ', e)
+            return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="An error occured while trying to login with google",
+                            data=None
+                        )
+    
+    def completed_user_profile_in_team_members(self, email, db:Session, user_id:int):
+        db.query(ProjectMemberModel).filter(ProjectMemberModel.user_email == email
+                                            ).update({ProjectMemberModel.user_id: user_id, 
+                                                      ProjectMemberModel.is_member:True,
+                                                       ProjectMemberModel.is_guest:False }, synchronize_session="auto")
+        db.commit()

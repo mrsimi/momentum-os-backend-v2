@@ -8,7 +8,7 @@ class UserModel(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
+    hashed_password = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     is_guest = Column(Boolean, default=False)
     date_created = Column(DateTime, default=datetime.now(timezone.utc))
@@ -16,3 +16,5 @@ class UserModel(Base):
     last_login = Column(DateTime, default=datetime.now(timezone.utc))
     is_verified = Column(Boolean, default=False)
     to_changepassword = Column(Boolean, nullable=True)
+    externalsignupprovider = Column(String, nullable=True)
+    externalsignup_id = Column(String, nullable=True)

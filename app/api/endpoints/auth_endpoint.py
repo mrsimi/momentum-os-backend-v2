@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from app.schemas.auth_schema import ForgotPasswordRequest, LoginRequest, RegisterRequest, UpdatePasswordRequest
+from app.schemas.auth_schema import ForgotPasswordRequest, GoogleLoginRequest, LoginRequest, RegisterRequest, UpdatePasswordRequest
 from app.schemas.response_schema import BaseResponse
 from app.services import UserService
 from fastapi.responses import JSONResponse
@@ -49,6 +49,11 @@ async def update_password(request: UpdatePasswordRequest):
     response = user_service.update_password(request.token, request.password)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
 
+@router.post("/google", response_model=BaseResponse[str])
+def google_auth(request:GoogleLoginRequest):
+    user_service = UserService()
+    response = user_service.google_auth(request)
+    return JSONResponse(status_code=response.statusCode, content=response.dict())
 
 
 

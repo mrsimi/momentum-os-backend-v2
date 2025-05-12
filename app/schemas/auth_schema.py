@@ -27,3 +27,4 @@ class UpdatePasswordRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+
