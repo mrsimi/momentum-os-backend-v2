@@ -195,7 +195,12 @@ class ProjectService:
                     return BaseResponse(
                         statusCode=status.HTTP_200_OK,
                         message="No Projects found",
-                        data=[]
+                        data= ProjectDashboardResponse(projects=[], analytics=ProjectAnalyticsResponse(
+                            active_projects=0,
+                            team_members=0,
+                            submitted_responses=0,
+                            active_projects_last_month=0
+                        ))
                     )
                 
                 this_month, last_month = self.get_project_analytics(projects)
@@ -238,7 +243,12 @@ class ProjectService:
                     statusCode=status.HTTP_200_OK,
                     message="Project found",
                     data= ProjectDashboardResponse (projects=projects_response, 
-                                                    analytics= None)
+                                                    analytics=ProjectAnalyticsResponse(
+                            active_projects=0,
+                            team_members=0,
+                            submitted_responses=0,
+                            active_projects_last_month=0
+                        ))
                                             )
 
             return BaseResponse(
