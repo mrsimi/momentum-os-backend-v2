@@ -77,7 +77,7 @@ class LoggedRoute(APIRoute):
                 masked = mask_sensitive(parsed)
                 safe_response_body = json.dumps(masked, separators=(",", ":"))
                 logging.info(
-                    f"<<< {request.method} {request.url.path} | Status: {response.status_code} | JSON: {safe_response_body}"
+                    f"<<< {request.method} {request.url.path} | Status: {response.status_code} | JSON: {safe_response_body[:500]}..."
                 )
             except Exception:
                 logging.info(
