@@ -1,70 +1,89 @@
-from fastapi import Request, Response, HTTPException
-from fastapi.exceptions import RequestValidationError
+from fastapi import Request, Response
 from fastapi.routing import APIRoute
-from http.client import responses
-from json import JSONDecodeError
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from traceback import format_exc
+from starlette.responses import StreamingResponse
 from typing import Callable
 import logging
+import json
 
-# Python builtin logging
-logging.basicConfig(
-    format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
-    level=logging.INFO
-)
+SENSITIVE_KEYS = frozenset({"password", "token", "secret", "access_token", "authorization", "auth", "api_key"})
 
-# FastAPI custom logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+def mask_sensitive(data):
+    """Recursively mask sensitive fields."""
+    if isinstance(data, dict):
+        return {
+            k: "****" if k.lower() in SENSITIVE_KEYS else mask_sensitive(v)
+            for k, v in data.items()
+        }
+    elif isinstance(data, list):
+        return [mask_sensitive(item) for item in data]
+    return data
+
 class LoggedRoute(APIRoute):
     def get_route_handler(self) -> Callable:
-        original_route_handler = super().get_route_handler()
-        sensitives_payload = ['password']
+        original_handler = super().get_route_handler()
 
-        async def custom_route_handler(request: Request) -> Response:
-            request_params = ""
+        async def custom_handler(request: Request) -> Response:
+            # --- Read and log request ---
+            body_bytes = await request.body()
+            query_params = request.query_params.multi_items()
+            request_body_text = body_bytes.decode("utf-8", errors="ignore") if body_bytes else ""
+
+            safe_query_params = {
+                k: "****" if k.lower() in SENSITIVE_KEYS else v
+                for k, v in query_params
+            }
 
             try:
-                # Decode request JSON body
-                request_json = await request.json()
-                request_params += " ".join(f"{k}={v}" for k, v in request_json.items() if k.lower() not in sensitives_payload)
-            except JSONDecodeError:
-                # Request has no JSON body
-                pass
+                parsed = json.loads(request_body_text)
+                masked = mask_sensitive(parsed)
+                safe_request_body = json.dumps(masked, separators=(",", ":"))
+            except Exception:
+                safe_request_body = request_body_text
 
-            # Decode request query params
-            if request.query_params:
-                request_params += " " if request_params else "" # add space for pretty printing
-                request_params += " ".join(f"{k}={v}" for k, v in request.query_params.items() if k.lower() not in sensitives_payload)
+            logging.info(
+                f">>> {request.method} {request.url.path} | Query: {safe_query_params} | Body: {safe_request_body}"
+            )
 
-            # Log the request
-            route_called = f"{request.method} {request.url.path} ({request_params})"
-            request_log = f"Request from {request.client.host}:{request.client.port}: {route_called}"
-            response_log = f"Response to {request.client.host}:{request.client.port}: {route_called}"
-            logging.info(request_log)
+            # Rebuild request stream
+            async def receive():
+                return {"type": "http.request", "body": body_bytes}
+            request._receive = receive
 
-            # Log the response
+            # --- Call original handler ---
+            response: Response = await original_handler(request)
+
+            response_body = b""
+            if isinstance(response, StreamingResponse):
+                chunks = []
+                async for chunk in response.body_iterator:
+                    chunks.append(chunk)
+                    response_body += chunk
+
+                response = Response(
+                    content=response_body,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type
+                )
+            else:
+                response_body = getattr(response, "body", b"")
+
+            # --- Log response ---
             try:
-                response: Response = await original_route_handler(request)
+                response_text = response_body.decode("utf-8", errors="ignore")
+                parsed = json.loads(response_text)
+                masked = mask_sensitive(parsed)
+                safe_response_body = json.dumps(masked, separators=(",", ":"))
+                logging.info(
+                    f"<<< {request.method} {request.url.path} | Status: {response.status_code} | JSON: {safe_response_body}"
+                )
+            except Exception:
+                logging.info(
+                    f"<<< {request.method} {request.url.path} | Status: {response.status_code} | Raw: {response_body[:500]!r}"
+                )
 
-                # Successful response
-                success_info = f"{response.status_code} {responses[response.status_code]}"
-                logging.info(f"{response_log} - {success_info}")
-                return response
-            except (HTTPException, StarletteHTTPException) as exc:
-                # HTTP exception
-                error_info = f"{exc.status_code} {responses[exc.status_code]}: {exc.detail}"
-                logging.info(f"{response_log} - {error_info}")
-                raise exc
-            except RequestValidationError as exc:
-                # Validation error
-                error_info = f"422 {responses[422]}: {exc.__class__.__name__}"
-                logging.info(f"{response_log} - {error_info}")
-                raise exc
-            except Exception as exc:
-                # Any other error
-                error_info = f"500 {responses[500]}: {exc.__class__.__name__}"
-                error_trace = format_exc()
-                logging.info(f"{response_log} - {error_info}\n{error_trace}")
-                raise HTTPException(500, error_trace)
+            return response
 
-        return custom_route_handler
+        return custom_handler

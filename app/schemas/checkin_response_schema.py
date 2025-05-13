@@ -24,11 +24,18 @@ class CheckInAnalyticsRequest(BaseCheckIn):
     team_member_id: int
 
 class CheckInAnalyticsResponse(BaseModel):
+    project_id: int
     checkin_date:date
     response_ids:List[int]
     summary:str
     blockers:str
     diversion_range: str
     diversion_context:str
+    checkin_responses: List[CheckInAnalyticsRequest]
+
+class GenerateSummaryRequest(BaseModel):
+    project_id:int
+    checkin_date:date
+    force_generation:bool
 
 

@@ -1,6 +1,8 @@
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
+import json
 import logging
+import pprint
 
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -9,7 +11,7 @@ from fastapi import status
 from app.core.database import SessionLocal
 from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.response_model import CheckInResponseModel, CheckInResponseTracker, CheckInResponsesInsights
-from app.schemas.checkin_response_schema import CheckInAnalyticsRequest, CheckInAnalyticsResponse, SubmitCheckInRequest
+from app.schemas.checkin_response_schema import CheckInAnalyticsRequest, CheckInAnalyticsResponse, GenerateSummaryRequest, SubmitCheckInRequest
 from app.schemas.response_schema import BaseResponse
 from app.services.ai_service import AiService
 from app.utils.security import decrypt_payload
@@ -147,7 +149,11 @@ class ResponseService:
                 ).all()
 
             if len(responses) == 0:
-                return None
+                return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="No responses found for this day",
+                    data=None
+                )
 
             members_responses = [
                 CheckInAnalyticsRequest(
@@ -158,7 +164,6 @@ class ResponseService:
                     team_member_id=res.team_member_id
                 ) for res in responses
             ]
-
             product_doc = db.query(ProjectModel).filter(
                 ProjectModel.id == project_id).first().description
 
@@ -186,33 +191,198 @@ class ResponseService:
             )
 
         except Exception as e:
-            logging.info(f'Error while recording response {e}')
+            logging.info(f'Error while generating ai response {e}')
             return BaseResponse(
                 statusCode=status.HTTP_400_BAD_REQUEST,
-                message="Error while trying to save your response",
+                message="Error while generating ai summary",
                 data=None
             )
 
-    # def get_check_analytics(self, project_id:int, checkin_date:date) -> BaseResponse[CheckInAnalyticsResponse]:
-    #     try:
-    #         with self.get_session() as db:
-    #             analytics = db.query(CheckInResponsesInsights).filter(CheckInResponsesInsights.project_id == project_id,
-    #                                                                   func.date(CheckInResponsesInsights.checkin_date) == checkin_date)
-    #             if not analytics:
-    #                 checkin = db.query(CheckinModel).first(CheckinModel.project_id == project_id)
-    #                 if not checkin:
-    #                     return BaseResponse(
-    #                         statusCode=status.HTTP_400_BAD_REQUEST,
-    #                         message="No checkin set for this project. Kindly contact customer care with the title of the project",
-    #                         data=None
-    #                     )
+    def get_check_analytics(self, project_id:int, checkin_date:date) -> BaseResponse[CheckInAnalyticsResponse]:
+        try:
+            if checkin_date > datetime.now().date():
+                return BaseResponse(
+                                statusCode=status.HTTP_400_BAD_REQUEST,
+                                message="No checks yet, you've selected a future date",
+                                data=None
+                            )
+            with self.get_session() as db:
+                analytics = db.query(CheckInResponsesInsights).filter(CheckInResponsesInsights.project_id == project_id,
+                                                                      func.date(CheckInResponsesInsights.checkin_date) == checkin_date).first()
+                if not analytics:
+                    checkin = db.query(CheckinModel).filter(CheckinModel.project_id == project_id).first()
+                    if not checkin:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="No checkin set for this project. Kindly contact customer care with the title of the project",
+                            data=None
+                        )
                     
-    #                 current_day = checkin_date.strftime("%A")
-    #                 if current_day in checkin.user_checkin_days:
-    #                     return BaseResponse(
-    #                         statusCode=status.HTTP_400_BAD_REQUEST,
-    #                         message="No checkin set for this project. Kindly contact customer care with the title of the project",
-    #                         data=None
-    #                     )
+                    checkin_tracker = db.query(CheckInResponseTracker).filter(CheckInResponseTracker.checkin_id == checkin.id,
+                                                                              func.date(CheckInResponseTracker.user_checkin_date) == checkin_date).first()
+                    
+                    current_day = checkin_date.strftime("%A")
+                    #current_time = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=int(checkin.user_timezone))))
+                    
+                    if current_day in checkin.user_checkin_days:
+                        if not checkin_tracker:
+                            return BaseResponse(
+                                statusCode=status.HTTP_400_BAD_REQUEST,
+                                message="Checks have not been sent in yet",
+                                data=None
+                            )
+                        
+                        if checkin_tracker.number_of_responses_received == 0:
+                            return BaseResponse(
+                                statusCode=status.HTTP_400_BAD_REQUEST,
+                                message="No checkins submitted yet",
+                                data=None
+                            )
+                        if checkin_tracker.number_of_responses_expecting != checkin_tracker.number_of_responses_received:
+                            return BaseResponse(
+                                statusCode=status.HTTP_417_EXPECTATION_FAILED,
+                                message=f"Expecting {checkin_tracker.number_of_responses_expecting}, but {checkin_tracker.number_of_responses_received} response(s) have been submitted. Do you want to still generate insights?",
+                                data=None
+                            )
+                        
+                        if checkin_tracker.number_of_responses_expecting == checkin_tracker.number_of_responses_received:
+                            return BaseResponse(
+                                statusCode=status.HTTP_417_EXPECTATION_FAILED,
+                                message=f"Insights not generated, kindly use the Generate insights button",
+                                data=None
+                            )
+                    else:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="There are no checks setup for today",
+                            data=None
+                        )
+                
+                else:
+                    responses = db.query(CheckInResponseModel) \
+                        .options(joinedload(CheckInResponseModel.team_member)) \
+                        .filter(
+                            CheckInResponseModel.id.in_(analytics.response_ids)
+                        ).all()
+                    
+                    members_responses = [
+                        CheckInAnalyticsRequest(
+                            did_yesterday=res.did_yesterday,
+                            doing_today=res.doing_today,
+                            blockers=res.blocker,
+                            email=res.team_member.user_email,
+                            team_member_id=res.team_member_id
+                        ) for res in responses
+                    ]
 
-    #     except Exception e:
+                    analytics_res = CheckInAnalyticsResponse(
+                        project_id=project_id, 
+                        checkin_date=checkin_date,
+                        response_ids=analytics.response_ids,
+                        summary=analytics.summary,
+                        blockers=analytics.blockers, 
+                        diversion_context=analytics.diversion_context,
+                        diversion_range=analytics.diversion_range,
+                        checkin_responses=members_responses
+                    )
+
+                    return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Success",
+                        data=analytics_res
+                    )
+
+
+        except Exception as e:
+            logging.info(f'Error while getting response {e}')
+            return BaseResponse(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="Error while trying to get response",
+                data=None
+            )
+
+    def generate_checkin_summary(self, request: GenerateSummaryRequest) -> BaseResponse[str]:
+        try:
+            if request.checkin_date > datetime.now().date():
+                return BaseResponse(
+                                statusCode=status.HTTP_400_BAD_REQUEST,
+                                message="No checks yet, you've selected a future date",
+                                data=None
+                            )
+            with self.get_session() as db:
+                analytics = db.query(CheckInResponsesInsights).filter(CheckInResponsesInsights.project_id == request.project_id,
+                                                                      func.date(CheckInResponsesInsights.checkin_date) == request.checkin_date).first()
+                if analytics:
+                    return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="Summary already generated for this project",
+                            data=None
+                        )
+                
+                checkin = db.query(CheckinModel).filter(CheckinModel.project_id == request.project_id).first()
+                if not checkin:
+                    return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="No checkin set for this project. Kindly contact customer care with the title of the project",
+                            data=None
+                        )
+                checkin_response_tracker = db.query(CheckInResponseTracker)\
+                    .filter(CheckInResponseTracker.checkin_id == checkin.id, 
+                            func.date(CheckInResponseTracker.user_checkin_date) == request.checkin_date).first()
+                
+                if not checkin_response_tracker:
+                    return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="No checkins sent for this day",
+                            data=None
+                        )
+                else:
+                    if checkin_response_tracker.number_of_responses_received == 0:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="No checkins submitted yet",
+                            data=None
+                        )
+
+                    if checkin_response_tracker.number_of_responses_expecting != \
+                        checkin_response_tracker.number_of_responses_received and \
+                            request.force_generation == False:
+                        return BaseResponse(
+                                    statusCode=status.HTTP_417_EXPECTATION_FAILED,
+                                    message=f"Expecting {checkin_response_tracker.number_of_responses_expecting}, but {checkin_response_tracker.number_of_responses_received} response(s) have been submitted. Do you want to continue",
+                                    data=None
+                                )
+                    
+                    if checkin_response_tracker.number_of_responses_expecting == \
+                        checkin_response_tracker.number_of_responses_received or \
+                        request.force_generation == True:
+
+                        analytics_res = self.process_analytics(
+                            checkin.id,
+                            datetime.combine(request.checkin_date, time.min),
+                            request.project_id,
+                            checkin_response_tracker.id,
+                            db
+                        )
+                        if analytics_res.statusCode != status.HTTP_200_OK:
+                            return analytics_res
+                        
+                        checkin_response_tracker.status = "COMPLETED_AI_PROCESS"
+                        checkin_response_tracker.is_analytics_processed = True
+
+                        db.commit()
+
+                        return BaseResponse(
+                            statusCode=status.HTTP_200_OK,
+                            message="Insights generated successfully",
+                            data=None
+                        )
+
+
+        except Exception as e:
+            logging.info(f'Error while getting response {e}')
+            return BaseResponse(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="Error while trying to get response",
+                data=None
+            )
