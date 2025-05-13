@@ -19,7 +19,7 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh ubuntu@${{ secrets.EC2_HOST }}
-          scp -r . ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/fastapi-app
+          scp -r . ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/momentum-os-backend-v2
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
