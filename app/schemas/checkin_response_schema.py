@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import List
 from pydantic import BaseModel, EmailStr
 
@@ -11,8 +11,7 @@ class CheckInResponse(BaseCheckIn):
     id: int
     project_id: int
     team_member_id: int
-    checkin_date_usertz: date
-    checkin_date_utctz: date
+    checkin_date_usertz: datetime
 
 #project_id={project_id}&user_email={user_email}&user_datetime={user_datetime}&user_checkinday={user_checkinday}&user_timezone={user_timezone}
 class SubmitCheckInRequest(BaseCheckIn):

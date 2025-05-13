@@ -456,7 +456,6 @@ class ProjectService:
                     project_id=response.project_id,
                     team_member_id=response.team_member_id,
                     checkin_date_usertz=response.checkin_date_usertz,
-                    checkin_date_utctz=response.checkin_date_utctz,
                     did_yesterday=response.did_yesterday,
                     doing_today=response.doing_today,
                     blockers=response.blocker
