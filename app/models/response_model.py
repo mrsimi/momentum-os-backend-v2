@@ -57,6 +57,7 @@ class CheckInAnalyticsModel(Base):
 class CheckInResponsesInsights(Base):
     __tablename__ = "checkin_responses_insights"
 
+    id = Column(Integer, primary_key=True)
     tracker_id = Column(Integer, primary_key=True, nullable=False)
     checkin_id = Column(Integer, nullable=False, index=True)
     project_id = Column(Integer, nullable=False, index=True)
