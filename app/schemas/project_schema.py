@@ -44,3 +44,12 @@ class ProjectMemberResponse(BaseModel):
     is_guest: bool
     is_active: bool
 
+class ProjectAnalyticsResponse(BaseModel):
+    active_projects:int
+    team_members:int
+    submitted_responses:int 
+    active_projects_last_month:int
+
+class ProjectDashboardResponse(BaseModel):
+    analytics: ProjectAnalyticsResponse
+    projects: list[ProjectResponse]

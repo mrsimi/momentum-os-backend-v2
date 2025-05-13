@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
-from app.schemas.project_schema import ProjectDetailsResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import ProjectDashboardResponse, ProjectDetailsResponse, ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
 from app.services.project_service import ProjectService
 from fastapi.encoders import jsonable_encoder
@@ -29,7 +29,7 @@ def submit_project_invite_response(url:str =Query(...)):
     response = project_service.submit_project_invite_response(url)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
 
-@router.get("", response_model=BaseResponse[list[ProjectResponse]])
+@router.get("", response_model=BaseResponse[ProjectDashboardResponse])
 def get_projects_by_creator_id(payload: dict = Depends(JWTBearer())):
     user_id = payload.get("user_id")
     project_service = ProjectService()

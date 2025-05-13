@@ -4,13 +4,14 @@ import logging
 import os
 from sqlalchemy.sql import func
 from app.core.database import SessionLocal
+from sqlalchemy import extract
 
 from app.infra.email_infra import EmailInfra
 from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.response_model import CheckInResponseModel
 from app.models.user_model import UserModel
 from app.schemas.checkin_response_schema import CheckInResponse
-from app.schemas.project_schema import ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import ProjectAnalyticsResponse, ProjectDashboardResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
 from app.utils.helpers import convert_utc_days_and_time
 from sqlalchemy.exc import IntegrityError
@@ -155,32 +156,97 @@ class ProjectService:
                 data=None
             )
 
-        
-    def get_projects_by_creator_id(self, user_id:int) -> BaseResponse[list[ProjectResponse]]:
-        with self.get_session() as db:
-            projects = db.query(ProjectModel).filter(ProjectModel.creator_user_id == user_id).all()
-            if not projects:
-                return BaseResponse(
-                    statusCode=status.HTTP_200_OK,
-                    message="No Projects found",
-                    data=[]
-                )
-            
-            projects_response = [
-                ProjectResponse(
-                    id=project.id,
-                    title=project.title,
-                    description=project.description,
-                    start_date=project.start_date,
-                    end_date=project.end_date,
-                    state= self.get_project_status(project)
-                ) for project in projects
-            ]
+    
+    def get_project_analytics(self, projects:list[ProjectModel]) -> tuple:
+        now = datetime.now()
+
+        # Determine last month and its year
+        if now.month == 1:
+            last_month = 12
+            last_month_year = now.year - 1
+        else:
+            last_month = now.month - 1
+            last_month_year = now.year
+
+        # Get projects for this month
+        this_month_projects = [
+            p for p in projects
+            if p.start_date.month == now.month and p.start_date.year == now.year and p.is_active
+        ]
+
+        # Get projects for last month
+        last_month_projects = [
+            p for p in projects
+            if p.start_date.month == last_month and p.start_date.year == last_month_year and p.is_active
+        ]
+
+        return (len(this_month_projects), len(last_month_projects))
+
+
+
+
+    def get_projects_by_creator_id(self, user_id:int) -> BaseResponse[ProjectDashboardResponse]:
+        projects_response = None
+        now = datetime.now()
+        try:
+            with self.get_session() as db:
+                projects = db.query(ProjectModel).filter(ProjectModel.creator_user_id == user_id).all()
+                if not projects:
+                    return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="No Projects found",
+                        data=[]
+                    )
+                
+                this_month, last_month = self.get_project_analytics(projects)
+                team_members = db.query(ProjectMemberModel).filter(
+                    extract('month', ProjectMemberModel.date_created) == now.month,
+                    extract('year', ProjectMemberModel.date_created) == now.year,
+                    ProjectMemberModel.is_active == True
+                ).count()
+                
+                submitted_response = db.query(CheckInResponseModel).filter(
+                    extract('month', CheckInResponseModel.checkin_date_usertz) == now.month,
+                    extract('year', CheckInResponseModel.checkin_date_usertz) == now.year
+                ).count()
+                
+                projects_response = [
+                    ProjectResponse(
+                        id=project.id,
+                        title=project.title,
+                        description=project.description,
+                        start_date=project.start_date,
+                        end_date=project.end_date,
+                        state= self.get_project_status(project)
+                    ) for project in projects
+                ]
             return BaseResponse(
                 statusCode=status.HTTP_200_OK,
                 message="Project found",
-                data= projects_response
+                data= ProjectDashboardResponse (projects=projects_response, 
+                                                analytics= ProjectAnalyticsResponse(
+                                                    active_projects=this_month, 
+                                                    team_members=team_members,
+                                                    submitted_responses=submitted_response,
+                                                    active_projects_last_month=last_month))
             )
+        except Exception as e:
+            logging.info(f'Error while get_projects_by_creator_id response {e}')
+
+            if projects_response:
+                return BaseResponse(
+                    statusCode=status.HTTP_200_OK,
+                    message="Project found",
+                    data= ProjectDashboardResponse (projects=projects_response, 
+                                                    analytics= None)
+                                            )
+
+            return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Error while trying to get project",
+                        data=None
+                    )
+
     
     def get_project_status(self, project: ProjectModel):
         return (
