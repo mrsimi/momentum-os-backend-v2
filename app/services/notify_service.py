@@ -4,6 +4,7 @@ from app.infra.email_infra import EmailInfra
 import os 
 from dotenv import load_dotenv
 import asyncpg
+import socket
 
 from app.utils.security import encrypt_payload
 load_dotenv()
@@ -80,10 +81,10 @@ async def fetch_checkins_and_notify():
 
             insert_tracker_query = """
                 insert into checkin_response_tracker
-                (status, number_of_responses_expecting, user_checkin_date, checkin_id, date_created)
-                values ($1, $2, $3, $4, $5)
+                (status, number_of_responses_expecting, user_checkin_date, checkin_id, date_created, from_server_name)
+                values ($1, $2, $3, $4, $5, $6)
                 """
-            await conn.execute(insert_tracker_query, 'EMAILS_SENT', len(members), user_datetime, checkin_id, datetime.now(timezone.utc))
+            await conn.execute(insert_tracker_query, 'EMAILS_SENT', len(members), user_datetime, checkin_id, datetime.now(timezone.utc), socket.gethostname())
 
         await conn.close()
     except Exception as e:

@@ -19,6 +19,7 @@ class CheckInResponseModel(Base):
     checkin_day = Column(String)
     checkin_id = Column(Integer, index=True)
     date_created_utc = Column(DateTime)
+    has_blocker=Column(Boolean)
 
     team_member = relationship(
                         "ProjectMemberModel", 

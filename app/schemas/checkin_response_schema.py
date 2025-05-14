@@ -38,3 +38,9 @@ class GenerateSummaryRequest(BaseModel):
     force_generation:bool
 
 
+class TrendDataPointResponse(BaseModel):
+    blockers_number:int
+    updates_number:int
+    checkin_date:date
+
+

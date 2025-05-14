@@ -3,8 +3,9 @@ from datetime import date, datetime, time, timedelta, timezone
 import json
 import logging
 import pprint
+from sqlalchemy.orm import aliased
 
-from sqlalchemy import func
+from sqlalchemy import Boolean, Date, Integer, cast, func, text
 from sqlalchemy.orm import joinedload
 from fastapi import status
 
@@ -38,6 +39,12 @@ class ResponseService:
             raise
         finally:
             self.db.close()
+    
+    def is_blocker_present(text: str) -> bool:
+        if not text or not text.strip():
+            return False
+        normalized = text.strip().lower()
+        return normalized not in ['none', 'no blockers', 'n/a', 'na', 'nope', ''] and len(normalized) > 3
 
     def submit_checkin(self, request: SubmitCheckInRequest) -> BaseResponse[str]:
         try:
@@ -95,7 +102,8 @@ class ResponseService:
                     blocker=request.blockers,
                     checkin_day=payload['user_checkinday'],
                     date_created_utc=datetime.now(timezone.utc),
-                    checkin_id=payload['checkin_id']
+                    checkin_id=payload['checkin_id'],
+                    has_blocker = self.is_blocker_present(request.blockers)
                 )
 
                 checkin_tracker.number_of_responses_received += 1
@@ -379,6 +387,60 @@ class ResponseService:
                         )
 
 
+        except Exception as e:
+            logging.info(f'Error while getting response {e}')
+            return BaseResponse(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="Error while trying to get response",
+                data=None
+            )
+        
+    def get_trends(self, user_id:int):
+        try:
+            with self.get_session() as db:
+                fourteen_days_ago = datetime.now() - timedelta(days=14)
+
+                query = text("""
+                    SELECT 
+                        cr.checkin_date_usertz::date AS checkin_date,
+                        COUNT(*) AS total_checkins,
+                        COUNT(*) FILTER (WHERE cr.has_blocker = TRUE) AS total_blockers
+                    FROM checkin_responses cr
+                    JOIN projects p ON cr.project_id = p.id
+                    WHERE p.creator_user_id = :user_id
+                    AND p.date_created > :date_created
+                    GROUP BY checkin_date
+                    ORDER BY checkin_date
+                """)
+
+                result = db.execute(query, {
+                    "user_id": user_id,
+                    "date_created": fourteen_days_ago.date().isoformat()
+                })
+
+                rows = result.fetchall()
+
+                # Optional: print rows for debugging
+                for row in rows:
+                    print(row)
+
+                data = [
+                    {
+                        "date": row[0].strftime("%Y-%m-%d"),
+                        "updates": row[1],
+                        "blockers": row[2] or 0,
+                    }
+                    for row in rows
+                ]
+
+                return BaseResponse(
+                    statusCode=status.HTTP_200_OK,
+                    message="Success",
+                    data=data
+                )
+
+                
+                
         except Exception as e:
             logging.info(f'Error while getting response {e}')
             return BaseResponse(

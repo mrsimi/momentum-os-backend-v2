@@ -29,9 +29,16 @@ def get_check_analytics(project_id:int=Query(...), checkin_date:date=Query(...))
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
 
 
-@router.post('/generate-summary', response_model=BaseResponse[CheckInAnalyticsResponse])
+@router.get('/generate-summary', response_model=BaseResponse[CheckInAnalyticsResponse])
 def generate_summary(request:GenerateSummaryRequest, payload: dict = Depends(JWTBearer())):
     project_service = ResponseService()
     response = project_service.generate_checkin_summary(request)
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
 
+
+@router.get('/trends')
+def get_trends(payload:dict = Depends(JWTBearer())):
+    response_service = ResponseService()
+    user_id = payload.get("user_id")
+    response = response_service.get_trends(user_id)
+    return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
