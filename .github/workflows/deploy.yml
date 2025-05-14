@@ -1,0 +1,44 @@
+name: Deploy FastAPI to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh ubuntu@${{ secrets.EC2_HOST }}
+          scp -r . ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/momentum-os-backend-v2
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh ${{ secrets.EC2_HOST }} << 'EOF'
+            cd ~/momentum-os-backend-v2
+
+            # Write .env from GitHub Secret
+            echo "${{ secrets.ENV_FILE }}" > .env
+
+            # Update code
+            git pull origin main
+
+            # Activate virtualenv
+            source venv/bin/activate
+
+            # Install dependencies
+            pip install -r requirements.txt
+
+            # Restart app
+            sudo systemctl restart gunicorn
+          EOF
