@@ -67,3 +67,5 @@ app.include_router(auth_endpoint.router, prefix=os.getenv("API_V1_STR"))
 app.include_router(project_endpoint.router, prefix=os.getenv("API_V1_STR"))
 app.include_router(checkin_response_endpoint.router, prefix=os.getenv("API_V1_STR"))
 
+#handler = Mangum(app)
+

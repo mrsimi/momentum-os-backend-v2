@@ -1,10 +1,11 @@
 from datetime import date
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from app.schemas.checkin_response_schema import CheckInAnalyticsResponse, GenerateSummaryRequest, SubmitCheckInRequest
 from app.schemas.response_schema import BaseResponse
 from app.services.response_service import ResponseService
+from app.utils.auth_bearer import JWTBearer
 from app.utils.logged_route import LoggedRoute
 
 router = APIRouter(
@@ -29,7 +30,7 @@ def get_check_analytics(project_id:int=Query(...), checkin_date:date=Query(...))
 
 
 @router.post('/generate-summary', response_model=BaseResponse[CheckInAnalyticsResponse])
-def generate_summary(request:GenerateSummaryRequest):
+def generate_summary(request:GenerateSummaryRequest, payload: dict = Depends(JWTBearer())):
     project_service = ResponseService()
     response = project_service.generate_checkin_summary(request)
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
