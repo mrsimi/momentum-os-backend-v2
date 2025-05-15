@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta, timezone
+import json
 import logging
+
+from pydantic import Json
 from app.infra.email_infra import EmailInfra
 import os 
 from dotenv import load_dotenv
@@ -45,6 +48,7 @@ async def fetch_checkins_and_notify():
         logging.info(checkins)
 
         for row in checkins:
+            
             email_infra = EmailInfra()
             project_id = row['project_id']
             #checkin_time_utc = row['checkin_time_utc']
@@ -52,6 +56,17 @@ async def fetch_checkins_and_notify():
             user_datetime = now_utc.astimezone(timezone(timedelta(hours=int(user_timezone))))
             user_checkinday = user_datetime.strftime("%A")
             checkin_id = row['id']
+
+            #get checkin
+            tracker_query = """
+            select id from checkin_response_tracker
+                where user_checkin_date::date = $1::date and checkin_id = $2
+            """
+
+            tracker_result = await conn.fetch(tracker_query, user_datetime, checkin_id)
+
+            if len(tracker_result) > 0:
+                logging.info(f'-- sent updates to the user already tracker_id: {json.json.dumps(tracker_result,indent=1)}')
 
             members_query = """
             SELECT user_email
