@@ -39,13 +39,13 @@ async def fetch_checkins_and_notify():
                 AND $2 = ANY(c.checkin_days_utc)
         """
 
-        logging.info(checkin_query, current_hour, current_day)
+        #logging.info(checkin_query, current_hour, current_day)
 
         checkins = await conn.fetch(checkin_query, current_hour, current_day)
         
 
         logging.info(f'-- found {len(checkins)} notifications')
-        logging.info(checkins)
+        #logging.info(checkins)
 
         for row in checkins:
             
@@ -87,11 +87,11 @@ async def fetch_checkins_and_notify():
                         "user_timezone": user_timezone,
                         "checkin_id": checkin_id
                 }
-                logging.info(payload)
+                #logging.info(payload)
                 encrypted_payload = encrypt_payload(payload)
                 link = f"{FRONTEND_URL}/check-in?project_id={project_id}&payload={encrypted_payload}"
 
-                logging.info(f'-- found member and link: {link}')
+                #logging.info(f'-- found member and link: {link}')
                 email_infra.send_email(user_email, "Submit Your CheckIn", "submit_checkin", {"link": link})
 
             insert_tracker_query = """

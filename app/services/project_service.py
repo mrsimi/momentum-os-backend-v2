@@ -156,7 +156,6 @@ class ProjectService:
                 data=None
             )
 
-    
     def get_project_analytics(self, projects:list[ProjectModel]) -> tuple:
         now = datetime.now()
 
@@ -181,9 +180,6 @@ class ProjectService:
         ]
 
         return (len(this_month_projects), len(last_month_projects))
-
-
-
 
     def get_projects_by_creator_id(self, user_id:int) -> BaseResponse[ProjectDashboardResponse]:
         projects_response = None
@@ -518,6 +514,70 @@ class ProjectService:
                         message="success",
                         data=response_data
                     )
+        except Exception as e:
+            logging.info(f'Error while get_projects_by_public response {e}')
+            return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Error while trying to get project",
+                        data=None
+                    )
+
+
+    #allow edit of name, description, start and end date and checkin time 
+    def edit_project(self, project_request:ProjectRequest, user_id:int, project_id: int) -> BaseResponse[str]:
+        try:
+            with self.get_session() as db:
+                project = db.query(ProjectModel).filter(ProjectModel.id == project_id,
+                                                           ProjectModel.creator_user_id == user_id).first()
+                if not project:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Project not found",
+                        data=None
+                    )
+                
+                if not project.is_active:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Project is no longer active.",
+                        data=None
+                    )
+                
+                checkin = db.query(CheckinModel).filter(CheckinModel.project_id == project_id).first()
+                if not checkin:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Checkin does not exist for the project. Kindly contact customer care",
+                        data=None
+                    )
+                
+                checkin_days_utc, checkin_time_utc = convert_utc_days_and_time(project_request.checkin_days,
+                                                        project_request.checkin_time,
+                                                        project_request.timezone)
+                
+                
+                project.title = project_request.title
+                project.description = project_request.description
+                project.start_date = project_request.start_date
+                project.end_date = project_request.end_date
+                project.date_updated = datetime.now(timezone.utc)
+
+                checkin.user_checkin_days = project_request.checkin_days
+                checkin.user_checkin_time = project_request.checkin_time
+                checkin.user_timezone = project_request.timezone
+                checkin.checkin_time_utc=checkin_time_utc,
+                checkin.checkin_days_utc = checkin_days_utc
+
+                db.commit()
+
+                return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Project successfully updated",
+                        data=None
+                    )
+
+                    
+
         except Exception as e:
             logging.info(f'Error while get_projects_by_public response {e}')
             return BaseResponse(

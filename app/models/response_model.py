@@ -35,11 +35,12 @@ class CheckInResponseTracker(Base):
     id = Column(Integer, primary_key=True)
     status = Column(String)
     number_of_responses_expecting = Column(Integer)
-    number_of_responses_received = Column(Integer)
-    is_analytics_processed = Column(Boolean)
+    number_of_responses_received = Column(Integer, default=0)
+    is_analytics_processed = Column(Boolean, default=False)
     user_checkin_date = Column(DateTime)
     checkin_id = Column(Integer)
     date_created=Column(DateTime)
+    from_server_name = Column(String, nullable=True)
 
 class CheckInAnalyticsModel(Base):
     __tablename__ = "checkin_analytics"

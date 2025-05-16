@@ -1,0 +1,1 @@
+do not allow multiple emails to be sent to same destination within the 5 mins of each other

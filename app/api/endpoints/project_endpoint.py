@@ -63,3 +63,11 @@ def deactivate_project(project_id: int, payload: dict = Depends(JWTBearer())):
     response = project_service.complete_project(project_id, user_id)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
 
+@router.put("/{project_id}", response_model=BaseResponse[str])
+def edit_project(request:ProjectRequest, project_id:int, payload:dict= Depends(JWTBearer())):
+    user_id = payload.get("user_id")
+    project_service = ProjectService()
+    response = project_service.edit_project(project_request=request, user_id=user_id,  project_id=project_id)
+    return JSONResponse(status_code=response.statusCode, content=response.dict())
+
+

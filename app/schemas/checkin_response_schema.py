@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 
 class BaseCheckIn(BaseModel):
@@ -43,4 +43,9 @@ class TrendDataPointResponse(BaseModel):
     updates_number:int
     checkin_date:date
 
+class SendCheckInReminderRequest(BaseModel):
+    project_id:int
+    checkin_date:date
+    creator_user_id:Optional[int] = None
+    member_email:str
 

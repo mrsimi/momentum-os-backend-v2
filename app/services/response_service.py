@@ -1,26 +1,28 @@
 from contextlib import contextmanager
 from datetime import date, datetime, time, timedelta, timezone
-import json
 import logging
-import pprint
-from sqlalchemy.orm import aliased
+import os
+import socket
 
-from sqlalchemy import Boolean, Date, Integer, cast, func, text
+from sqlalchemy import any_, func, literal, text
 from sqlalchemy.orm import joinedload
 from fastapi import status
 
 from app.core.database import SessionLocal
+from app.infra.email_infra import EmailInfra
 from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.response_model import CheckInResponseModel, CheckInResponseTracker, CheckInResponsesInsights
-from app.schemas.checkin_response_schema import CheckInAnalyticsRequest, CheckInAnalyticsResponse, GenerateSummaryRequest, SubmitCheckInRequest
+from app.schemas.checkin_response_schema import CheckInAnalyticsRequest, CheckInAnalyticsResponse, GenerateSummaryRequest, SendCheckInReminderRequest, SubmitCheckInRequest
 from app.schemas.response_schema import BaseResponse
 from app.services.ai_service import AiService
-from app.utils.security import decrypt_payload
+from app.utils.security import decrypt_payload, encrypt_payload
 
 logging.basicConfig(
     format="%(asctime)s [%(process)d] [%(levelname)s] %(message)s",
     level=logging.INFO
 )
+
+FRONTEND_URL = os.getenv('FRONTEND_URL')
 
 class ResponseService:
     def __init__(self):
@@ -40,7 +42,7 @@ class ResponseService:
         finally:
             self.db.close()
     
-    def is_blocker_present(text: str) -> bool:
+    def is_blocker_present(self, text: str) -> bool:
         if not text or not text.strip():
             return False
         normalized = text.strip().lower()
@@ -396,6 +398,7 @@ class ResponseService:
             )
         
     def get_trends(self, user_id:int):
+
         try:
             with self.get_session() as db:
                 fourteen_days_ago = datetime.now() - timedelta(days=14)
@@ -446,5 +449,143 @@ class ResponseService:
             return BaseResponse(
                 statusCode=status.HTTP_400_BAD_REQUEST,
                 message="Error while trying to get response",
+                data=None
+            )
+        
+    def send_reminder(self, request: SendCheckInReminderRequest) -> BaseResponse[str]:
+
+        try:
+            #get_day
+            user_checkinday = request.checkin_date.strftime("%A")
+            email_infra = EmailInfra()
+            with self.get_session() as db:
+                project = db.query(ProjectModel).filter(ProjectModel.creator_user_id == request.creator_user_id, 
+                                                        ProjectModel.id == request.project_id,
+                                                        ProjectModel.is_active == True).first()
+                
+                if not project:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Project not found",
+                        data=None
+                    )
+                
+                checkin_date: date = request.checkin_date
+                start_date: date = project.start_date.date() if isinstance(project.start_date, datetime) else project.start_date
+                end_date: date = project.end_date.date() if isinstance(project.end_date, datetime) else project.end_date
+
+                if checkin_date < start_date or checkin_date > end_date:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Invalid date selected for this project",
+                        data=None
+                    )
+                
+
+                checkin =db.query(CheckinModel).filter(
+                        CheckinModel.project_id == request.project_id,
+                        CheckinModel.is_active == True,
+                        user_checkinday == any_(CheckinModel.user_checkin_days)
+                    ).first()
+
+                if not checkin:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Invalid checkin for this project",
+                        data=None
+                    )
+                
+                checkin_tracker = db.query(CheckInResponseTracker).filter(
+                                        CheckInResponseTracker.checkin_id == checkin.id, 
+                                        func.date(CheckInResponseTracker.user_checkin_date) == request.checkin_date
+                                    ).first()
+                
+                if not checkin_tracker:
+                    #create tracker and send
+                    team_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == request.project_id,
+                                                                        ProjectMemberModel.is_active == True).all()
+                    for member in team_members:
+                        if member.user_email.lower().strip() == request.member_email.lower().strip():
+                            user_email = member.user_email
+                            payload = {
+                                    "user_email": user_email,
+                                    "user_datetime":request.checkin_date.isoformat(),
+                                    "user_checkinday": user_checkinday,
+                                    "user_timezone": checkin.user_timezone,
+                                    "checkin_id": checkin.id
+                            }
+                            logging.info(payload)
+                            encrypted_payload = encrypt_payload(payload)
+                            link = f"{FRONTEND_URL}/check-in?project_id={request.project_id}&payload={encrypted_payload}"
+
+                            logging.info(f'-- found member and link: {link}')
+                            email_infra.send_email(user_email, "Submit Your CheckIn", "submit_checkin", {"link": link})
+                    
+                    checkin_tracker = CheckInResponseTracker(
+                        status = 'EMAILS_SENT',
+                        number_of_responses_expecting = len(team_members),
+                        user_checkin_date = request.checkin_date,
+                        checkin_id = checkin.id,
+                        date_created = datetime.now(timezone.utc), 
+                        from_server_name = socket.gethostname()
+                    )
+                    db.add(checkin_tracker)
+                    db.commit()
+
+                    return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Emails sent successfully",
+                        data=None
+                    )
+
+                else:
+                    if checkin_tracker.is_analytics_processed:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="Analytics has been generated for this day cannot submit checkin anymore",
+                            data=None
+                        )
+                    else:
+                        #send emails to team members
+                        team_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == request.project_id,
+                                                                        ProjectMemberModel.is_active == True).all()
+                        
+                        for member in team_members:
+                            if member.user_email.lower().strip() == request.member_email.lower().strip():
+                                user_email = member.user_email
+                                payload = {
+                                        "user_email": user_email,
+                                        "user_datetime": checkin_tracker.user_checkin_date.isoformat(),
+                                        "user_checkinday": user_checkinday,
+                                        "user_timezone": checkin.user_timezone,
+                                        "checkin_id": checkin_tracker.id
+                                }
+                                logging.info(payload)
+                                encrypted_payload = encrypt_payload(payload)
+                                link = f"{FRONTEND_URL}/check-in?project_id={request.project_id}&payload={encrypted_payload}"
+
+                                logging.info(f'-- found member and link: {link}')
+                                email_infra.send_email(user_email, "Submit Your CheckIn", "submit_checkin", {"link": link})
+                                
+                                return BaseResponse(
+                                    statusCode=status.HTTP_200_OK,
+                                    message="Emails sent successfully",
+                                    data=None
+                                )
+                            
+                            else:
+                                return BaseResponse(
+                                    statusCode=status.HTTP_400_BAD_REQUEST,
+                                    message="Invalid Email",
+                                    data=None
+                                )
+
+
+
+        except Exception as e:
+            logging.info(f'Error while trying to send reminder {e}')
+            return BaseResponse(
+                statusCode=status.HTTP_400_BAD_REQUEST,
+                message="Error while trying to send reminder",
                 data=None
             )
