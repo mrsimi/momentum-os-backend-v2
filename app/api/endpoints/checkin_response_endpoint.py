@@ -29,7 +29,7 @@ def get_check_analytics(project_id:int=Query(...), checkin_date:date=Query(...))
     return JSONResponse(status_code=response.statusCode, content=jsonable_encoder(response))
 
 
-@router.get('/generate-summary', response_model=BaseResponse[CheckInAnalyticsResponse])
+@router.post('/generate-summary', response_model=BaseResponse[CheckInAnalyticsResponse])
 def generate_summary(request:GenerateSummaryRequest, payload: dict = Depends(JWTBearer())):
     project_service = ResponseService()
     response = project_service.generate_checkin_summary(request)
