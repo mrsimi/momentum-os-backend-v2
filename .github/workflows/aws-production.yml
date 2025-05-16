@@ -1,39 +1,39 @@
-name: Deploy FastAPI to EC2
+# name: Deploy FastAPI to EC2
 
-on:
-  push:
-    branches: [main]
+# on:
+#   push:
+#     branches: [main]
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v3
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+#       - name: Setup SSH
+#         run: |
+#           mkdir -p ~/.ssh
+#           echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
+#           chmod 600 ~/.ssh/id_rsa
+#           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
-        run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd ${{ secrets.EC2_APP_DIR }}
+#       - name: Deploy to EC2
+#         run: |
+#           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+#             cd ${{ secrets.EC2_APP_DIR }}
 
-            # Pull latest changes
-            git pull origin main
+#             # Pull latest changes
+#             git pull origin main
 
-            # Write .env from secret
-            echo "${{ secrets.ENV_FILE }}" > .env
+#             # Write .env from secret
+#             echo "${{ secrets.ENV_FILE }}" > .env
 
-            # Activate environment and install dependencies
-            source venv/bin/activate
-            pip install -r requirements.txt
+#             # Activate environment and install dependencies
+#             source venv/bin/activate
+#             pip install -r requirements.txt
 
-            # Restart the FastAPI systemd service
-            sudo systemctl restart fastapi
-          EOF
+#             # Restart the FastAPI systemd service
+#             sudo systemctl restart fastapi
+#           EOF
