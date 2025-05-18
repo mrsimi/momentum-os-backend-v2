@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
-from app.api.endpoints import auth_endpoint, checkin_response_endpoint, project_endpoint
+from app.api.endpoints import auth_endpoint, checkin_response_endpoint, project_endpoint, subscription_endpoint
 from app.services.notify_service import fetch_checkins_and_notify
 load_dotenv()
 
@@ -66,6 +66,6 @@ app.add_middleware(
 app.include_router(auth_endpoint.router, prefix=os.getenv("API_V1_STR"))
 app.include_router(project_endpoint.router, prefix=os.getenv("API_V1_STR"))
 app.include_router(checkin_response_endpoint.router, prefix=os.getenv("API_V1_STR"))
-
+app.include_router(subscription_endpoint.router, prefix=os.getenv("API_V1_STR"))
 #handler = Mangum(app)
 

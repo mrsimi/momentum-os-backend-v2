@@ -103,4 +103,4 @@ async def fetch_checkins_and_notify():
 
         await conn.close()
     except Exception as e:
-        logging.error(f"Failed fetch_checkins_and_notify {e}")
+        logging.error("fetch_checkins_and_notify failed with ex: %s", e)

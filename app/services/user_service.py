@@ -151,7 +151,7 @@ class UserService:
                         data=None
                     )
         except Exception as e:
-            logging.error('Error on login', e)
+            logging.error("login failed with ex: %s", e)
             return BaseResponse(
                             statusCode=status.HTTP_400_BAD_REQUEST,
                             message="An error occured while trying to login",
@@ -320,7 +320,7 @@ class UserService:
                 
             
         except Exception as e:
-            logging.error('Error on signin with google ', e)
+            logging.error("google login failed with ex: %s", e)
             return BaseResponse(
                             statusCode=status.HTTP_400_BAD_REQUEST,
                             message="An error occured while trying to login with google",
