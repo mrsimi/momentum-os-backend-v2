@@ -135,8 +135,8 @@ class SubscriptionService:
                     email=user.email,
                     amount=1,  # Replace with real amount
                     plan=plan.external_plan_code,
-                    channels=['card']
-                    #callback_url=os.getenv("BACKEND_URL")
+                    channels=['card'],
+                    callback_url=os.getenv("FRONTEND_URL")+'/dashboard'
                 )
 
                 if not response.status:
