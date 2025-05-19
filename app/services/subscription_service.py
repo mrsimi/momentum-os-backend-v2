@@ -6,6 +6,7 @@ from pprint import pprint
 import paystack
 from app.core.database import SessionLocal
 from app.models.user_model import UserModel
+from app.schemas.auth_schema import SubscriptionResponse
 from app.schemas.response_schema import BaseResponse
 from fastapi import status
 import os 
@@ -126,7 +127,7 @@ class SubscriptionService:
                         
                         db.commit()
                         return BaseResponse(
-                            statusCode=status.HTTP_200_OK,
+                            statusCode=status.HTTP_400_BAD_REQUEST,
                             message="User already has a valid subscription",
                             data=None
                         )
@@ -134,8 +135,8 @@ class SubscriptionService:
                     email=user.email,
                     amount=1,  # Replace with real amount
                     plan=plan.external_plan_code,
-                    channels=['card'],
-                    callback_url=os.getenv("BACKEND_URL")
+                    channels=['card']
+                    #callback_url=os.getenv("BACKEND_URL")
                 )
 
                 if not response.status:
@@ -152,6 +153,7 @@ class SubscriptionService:
                     user_subscription.external_customer_id = external_customer_id
                     user_subscription.external_transaction_ref = response.data['reference']
                     user_subscription.is_active = False
+                    user_subscription.date_updated = datetime.now(timezone.utc) 
                 else:
                     user_subscription = UserSubscriptionModel(
                         user_id=user_id,
@@ -167,7 +169,7 @@ class SubscriptionService:
                 db.commit()
 
                 return BaseResponse(
-                    statusCode=status.HTTP_308_PERMANENT_REDIRECT,
+                    statusCode=status.HTTP_200_OK,
                     message="Success",
                     data=response.data['authorization_url']
                 )
@@ -190,8 +192,8 @@ class SubscriptionService:
                 external_customer_id = data.get('customer', {}).get('id')
                 plan_id = data.get('plan', {}).get('id')
                 
-                next_payment_date = data.get('next_payment_date') 
-                ref = data.get('reference')
+                #next_payment_date = data.get('next_payment_date') 
+                #ref = data.get('reference')
 
                 webhook_data = WebhookLogsModel(
                     external_customer_id = external_customer_id,
@@ -202,7 +204,8 @@ class SubscriptionService:
                 db.add(webhook_data)
                 db.commit()
 
-                user_plan = db.query(PlansModel).filter(PlansModel.external_plan_id == f'{plan_id}').first()
+                user_plan = db.query(PlansModel).filter(
+                    PlansModel.external_plan_id == f'{plan_id}').first()
                 if not user_plan:
                     return BaseResponse(
                         statusCode=status.HTTP_200_OK,
@@ -214,19 +217,46 @@ class SubscriptionService:
                                     .filter(UserSubscriptionModel.external_customer_id == f'{external_customer_id}',
                                             UserSubscriptionModel.plan_id == user_plan.id).first()
                 
-                
-                if stage == 'charge.success':
-                    user_subscription.stage = 'active'
-                    user_subscription.is_active = True
-                else:
-                    user_subscription.stage = stage
-                    user_subscription.is_active = False
-                
-                if next_payment_date: 
-                    user_subscription.next_payment_date = next_payment_date
-                
-                if ref:
-                    user_subscription.external_transaction_ref = ref
+                match stage:
+                    case 'invoice.create':
+                        user_subscription.stage = stage
+                        next_payment_date = data.get('subscription', {}).get('next_payment_date')
+                        user_subscription.next_payment_date = next_payment_date
+                        reference = data.get('transaction', {}).get('reference')
+                        user_subscription.external_transaction_ref = reference
+                    
+                    case 'invoice.payment_failed':
+                        user_subscription.stage = stage
+                        user_subscription.is_active = False
+                    
+                    case 'invoice.update':
+                        user_subscription.stage = stage
+                        next_payment_date = data.get('subscription', {}).get('next_payment_date')
+                        user_subscription.next_payment_date = next_payment_date
+                        reference = data.get('transaction', {}).get('reference')
+                        user_subscription.external_transaction_ref = reference
+
+                    case 'subscription.create':
+                        user_subscription.stage = "active"
+                        user_subscription.is_active = True
+                        next_payment_date = data.get('next_payment_date')
+                        user_subscription.next_payment_date = next_payment_date
+                    
+                    case 'subscription.disable':
+                        user_subscription.stage = stage
+                        user_subscription.is_active = False 
+                        next_payment_date = data.get('next_payment_date')
+                        user_subscription.next_payment_date = next_payment_date
+                    
+                    case 'subscription.not_renew':
+                        user_subscription.stage = stage
+                        next_payment_date = data.get('next_payment_date')
+                        user_subscription.next_payment_date = next_payment_date
+                    
+                    case 'charge.success':
+                        user_subscription.stage = 'active'
+                        user_subscription.is_active = True
+                        user_subscription.external_transaction_ref = data.get('reference')
 
                 user_subscription.date_updated = datetime.now(timezone.utc)
 
@@ -246,4 +276,126 @@ class SubscriptionService:
                 message="Internal server error",
                 data=None
             )
-    
+
+    def handle_callback(self, txref:str, reference:str) -> BaseResponse[str]:
+        try:
+            with self.get_session() as db:
+                transaction = self.paystack.Transaction.verify(reference=reference)
+                if not transaction.status:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Transaction not found",
+                        data=None
+                    )
+                
+                data = transaction.data
+                external_customer_id = data.get('customer', {}).get('id')
+                plan_id = data.get('plan_object', {}).get('id')
+
+                user_plan = db.query(PlansModel).filter(PlansModel.external_plan_id == f'{plan_id}').first()
+                if not user_plan:
+                    return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Invalid plan",
+                        data=None
+                    )
+
+                user_subscription = db.query(UserSubscriptionModel)\
+                                    .filter(UserSubscriptionModel.external_customer_id == f'{external_customer_id}',
+                                            UserSubscriptionModel.plan_id == user_plan.id).first()
+                
+                if not user_subscription:
+                    return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="User subscription not found",
+                        data=None
+                    )
+                
+                
+                subscription_for_user_plan = paystack.Subscription.list(
+                    plan=user_plan.external_plan_id,
+                    customer = external_customer_id
+                )
+
+                if subscription_for_user_plan.data:
+                    last_subscription = subscription_for_user_plan.data[-1]
+                    if last_subscription['status'] in ['active', 'non-renewing']:
+                        user_subscription.stage = last_subscription['status']
+                        user_subscription.next_payment_date = last_subscription['next_payment_date']
+                        user_subscription.is_active = True
+                        user_subscription.external_customer_id = external_customer_id
+                    else:
+                        user_subscription.is_active = False
+                        user_subscription.stage = last_subscription['status']
+                    
+                    user_subscription.date_updated = datetime.now(timezone.utc)
+
+                    db.commit()
+                    return BaseResponse(
+                            statusCode=status.HTTP_200_OK,
+                            message="Callback handled", #redirect to success page
+                            data=None
+                        )   
+                    
+                return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="Callback failed", #redirect to error page 
+                    data=None
+                )
+                
+
+        except Exception as e:
+            logging.error("handle_callback failed with ex: %s", e)
+            return BaseResponse(
+                statusCode=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Internal server error",
+                data=None
+            ) 
+
+    def get_user_subscription(self, user_id:int, db) -> BaseResponse[SubscriptionResponse]:
+        try:
+                user = db.query(UserModel).filter(
+                    UserModel.id == user_id).first()
+                if not user:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="User not found",
+                        data=None
+                    )
+
+                if not user.is_active:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="User is not active",
+                        data=None
+                    )
+
+                user_subscription = db.query(UserSubscriptionModel)\
+                    .filter(UserSubscriptionModel.user_id == user_id,
+                            UserSubscriptionModel.is_active == True).first()
+
+                # try to fetch plan external
+
+                if not user_subscription or not user_subscription.is_active:
+                    return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="User subscription not found",
+                        data=SubscriptionResponse(plan_id=0, plan_name="Free")
+                    )
+
+                plan = db.query(PlansModel).filter(
+                    PlansModel.id == user_subscription.plan_id).first()
+                return BaseResponse(
+                    statusCode=status.HTTP_200_OK,
+                    message="User subscription not found",
+                    data=SubscriptionResponse(
+                        plan_id=plan.id, plan_name=plan.readable_name)
+                )
+
+        except Exception as e:
+            logging.error("get_user_subscription failed with ex: %s", e)
+            return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="User subscription not found",
+                        data=SubscriptionResponse(plan_id=0, plan_name="Free")
+                    )

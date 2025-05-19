@@ -8,6 +8,7 @@ from app.models.user_model import UserModel
 from app.core.database import SessionLocal
 from typing import Optional
 from contextlib import contextmanager
+from app.services.subscription_service import SubscriptionService
 from app.utils.security import check_password, create_access_token, generate_encrypted_user_id, hash_password, decrypt_encrypted_user_id
 
 from app.schemas.auth_schema import GoogleLoginRequest, LoginRequest, RegisterRequest
@@ -133,10 +134,13 @@ class UserService:
                         user.last_login = datetime.now(timezone.utc)
                         db.commit()
                         db.refresh(user)
+
+                        subscriptionService = SubscriptionService()
+                        sub = subscriptionService.get_user_subscription(user.id, db)
                         return BaseResponse(
                             statusCode=status.HTTP_200_OK,
                             message="Login successful",
-                            data= { "user_id": user.id, "access_token": access_token }
+                            data= { "user_id": user.id, "access_token": access_token, "subscription": sub.data}
                         )
                     else:
                         return BaseResponse(

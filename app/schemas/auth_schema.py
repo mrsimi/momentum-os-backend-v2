@@ -27,4 +27,9 @@ class UpdatePasswordRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+class SubscriptionResponse(BaseModel):
+    plan_id: int
+    plan_name: str
+
+
 

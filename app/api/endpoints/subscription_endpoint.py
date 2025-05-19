@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -27,3 +27,10 @@ def webhook(payload:dict):
     subscriptionService = SubscriptionService()
     res = subscriptionService.save_webhook_data(payload)
     return JSONResponse(status_code=res.statusCode, content=jsonable_encoder(res))
+
+@router.get('/callback', response_model=BaseResponse[str])
+def callback(txref:str=Query(...), reference:str=Query(...)):
+    subscriptionService = SubscriptionService()
+    res = subscriptionService.handle_callback(txref, reference)
+    return JSONResponse(status_code=res.statusCode, content=jsonable_encoder(res))
+
