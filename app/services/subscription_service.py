@@ -96,7 +96,7 @@ class SubscriptionService:
                     plan=plan.external_plan_id,
                     customer = external_customer_id
                 )
-                pprint(subscription_for_user_plan)
+                #pprint(subscription_for_user_plan)
                 if subscription_for_user_plan.status == False:
                     return BaseResponse(
                         statusCode=status.HTTP_400_BAD_REQUEST,
