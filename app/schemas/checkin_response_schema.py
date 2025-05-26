@@ -49,3 +49,7 @@ class SendCheckInReminderRequest(BaseModel):
     creator_user_id:Optional[int] = None
     member_email:str
 
+class GenerateContentRequest(BaseModel):
+    project_id: int
+    checkin_dates: List[date]
+
