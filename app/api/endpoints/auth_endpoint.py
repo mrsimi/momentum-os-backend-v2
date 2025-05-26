@@ -18,6 +18,10 @@ async def register(request: RegisterRequest):
     response = user_service.register(request)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
 
+@router.post("/test", response_model=BaseResponse[str])
+async def test():
+    return JSONResponse(status_code=200, content={"message": "Test endpoint is working!"})
+
 #after verify redirect users to login page.
 @router.post("/verify-email", response_model=BaseResponse[str])
 async def verify_email(token: str = Query(...)):
