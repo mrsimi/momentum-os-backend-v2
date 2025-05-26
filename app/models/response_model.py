@@ -71,6 +71,20 @@ class CheckInResponsesInsights(Base):
     diversion_context = Column(String, nullable=True)
     date_created = Column(DateTime, default=datetime.now(timezone.utc))
 
+class GeneratedContent(Base):
+    __tablename__ = "generated_content"
+
+    id = Column(Integer, primary_key=True)
+    content = Column(String, nullable=False)
+    checkin_id = Column(Integer, nullable=False, index=True)
+    project_id = Column(Integer, nullable=False, index=True)
+    date_created = Column(DateTime, default=datetime.now(timezone.utc))
+    checkin_dates = Column(ARRAY(DateTime), nullable=False)
+    checkin_response_ids = Column(ARRAY(Integer), nullable=True)  # IDs of check-in responses related to this content
+    content_type = Column(String, nullable=False)  # e.g., "blog", "pitch", etc.
+    user_id = Column(Integer, nullable=False, index=True)  # ID of the user who generated this content
+    
+
 
 
 

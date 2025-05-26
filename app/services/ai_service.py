@@ -53,5 +53,43 @@ class AiService:
         json_str = response.text.strip().replace("```json", "").replace("```", "")
         json_obj = json.loads(json_str)
 
-        print(json_obj)
+        #print(json_obj)
         return json_obj
+
+    def generate_content(self, 
+                         summaries: List[str],
+                         description: str 
+    ) -> str:
+        """
+        Generate a summary of the provided summaries.
+        """
+        prompt = f"""
+        You are an AI assistant helping a product team create engaging behind-the-scenes content from their daily check-ins.
+
+        Given a list of update summaries, write a detailed narrative that highlights the process, 
+        struggles, problem-solving, and milestones the team experienced while building the product. 
+        The content should feel like a blog post that tells the story of the team's journey—showcasing their challenges, 
+        how they tackled them, and the progress they made.
+
+        Summaries:
+        {summaries}
+
+        Product Description:
+        {description}
+
+        Please provide your output in JSON format with the following structure:
+        {{
+            "summary": "A detailed, story-driven behind-the-scenes blog post that captures the journey, challenges, and solutions."
+        }}
+        """
+
+
+        response = self.client.models.generate_content(
+            model='gemini-2.0-flash-001', contents=prompt
+        )
+        
+        # Handle output formatting
+        json_str = response.text.strip().replace("```json", "").replace("```", "")
+        json_obj = json.loads(json_str)
+
+        return json_obj.get("summary", "")

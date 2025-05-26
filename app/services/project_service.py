@@ -9,10 +9,12 @@ from sqlalchemy import extract
 from app.infra.email_infra import EmailInfra
 from app.models.project_model import CheckinModel, ProjectMemberModel, ProjectModel
 from app.models.response_model import CheckInResponseModel
+from app.models.subscription_model import UserSubscriptionModel
 from app.models.user_model import UserModel
 from app.schemas.checkin_response_schema import CheckInResponse
 from app.schemas.project_schema import ProjectAnalyticsResponse, ProjectDashboardResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse
 from app.schemas.response_schema import BaseResponse
+from app.services.subscription_service import SubscriptionService
 from app.utils.helpers import convert_utc_days_and_time
 from sqlalchemy.exc import IntegrityError
 
@@ -62,6 +64,53 @@ class ProjectService:
                         message="User not found",
                         data=None
                     )
+                
+                #get user subscription and check if they can create project
+                user_sub = SubscriptionService().get_user_subscription(user_id, db=db)
+
+                now = datetime.now(timezone.utc)
+                current_year = now.year
+                current_month = now.month
+
+                months_projects = db.query(ProjectModel).filter(
+                    ProjectModel.creator_user_id == user_id,
+                    extract('year', ProjectModel.date_created) == current_year,
+                    extract('month', ProjectModel.date_created) == current_month
+                ).count()
+
+                added_members = len(project_request.members_emails)
+
+                if user_sub.data.plan_id == 0:
+                    # Free plan limits
+                    if months_projects >= 3:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="You have reached the maximum number of projects for this month. Please upgrade your plan to create more projects.",
+                            data=None
+                        )
+                    if added_members > 3:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="Free plan allows a maximum of 3 members per project. Please reduce team size or upgrade your plan.",
+                            data=None
+                        )
+                elif user_sub.data.plan_id == 1:
+                    # Basic plan limits
+                    if months_projects >= 10:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="You have reached the maximum number of projects for this month. Kindly contact customer care to upgrade your plan.",
+                            data=None
+                        )
+                    if added_members > 10:
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message="Basic plan allows a maximum of 10 members per project. Please reduce team size or upgrade your plan.",
+                            data=None
+                        )
+
+
+
 
                 #get members with their email 
                 members_already_user = db.query(UserModel).filter(UserModel.email.in_(project_request.members_emails)).all()
