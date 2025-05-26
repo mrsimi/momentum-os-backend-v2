@@ -21,8 +21,10 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            cd ${{ secrets.EC2_APP_DIR }}
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+            set -x
+            export PYTHONUNBUFFERED=1
+            cd momentum-os-backend-v2
 
             # Pull latest changes
             git pull origin main

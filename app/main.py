@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
         logging.info("Background task cancelled during shutdown.")
 
 app = FastAPI(
-    title="DoTellBoard API",
+    title=os.getenv("PROJECT_NAME"),
     openapi_url=f"{os.getenv('API_V1_STR')}/openapi.json",
     lifespan=lifespan
 )
