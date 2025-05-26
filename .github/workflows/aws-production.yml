@@ -26,6 +26,9 @@ jobs:
             export PYTHONUNBUFFERED=1
             cd momentum-os-backend-v2
 
+            #https://github.com/mrsimi/momentum-os-backend-v2.git
+            #git remote set-url origin https://${{GITHUBTOKEN}}@github.com/mrsimi/momentum-os-backend-v2.git
+
             # Pull latest changes
             git pull origin main
 
