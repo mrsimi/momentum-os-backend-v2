@@ -1,7 +1,9 @@
 
 
 from datetime import datetime, timezone
-from sqlalchemy import ARRAY, Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import  Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import ARRAY
+
 from app.core.database import Base
 from sqlalchemy.orm import relationship
 
@@ -72,7 +74,7 @@ class CheckInResponsesInsights(Base):
     date_created = Column(DateTime, default=datetime.now(timezone.utc))
 
 class GeneratedContent(Base):
-    __tablename__ = "generated_content"
+    __tablename__ = "generated_contents"
 
     id = Column(Integer, primary_key=True)
     content = Column(String, nullable=False)

@@ -83,6 +83,7 @@ class AiService:
         }}
         """
 
+        #print(prompt)
 
         response = self.client.models.generate_content(
             model='gemini-2.0-flash-001', contents=prompt
@@ -90,6 +91,7 @@ class AiService:
         
         # Handle output formatting
         json_str = response.text.strip().replace("```json", "").replace("```", "")
+        print(json_str)
         json_obj = json.loads(json_str)
 
         return json_obj.get("summary", "")

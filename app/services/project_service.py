@@ -108,8 +108,7 @@ class ProjectService:
                             message="Basic plan allows a maximum of 10 members per project. Please reduce team size or upgrade your plan.",
                             data=None
                         )
-
-
+                    
 
 
                 #get members with their email 

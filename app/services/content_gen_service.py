@@ -11,6 +11,8 @@ from app.models.response_model import CheckInResponsesInsights, GeneratedContent
 from app.schemas.response_schema import BaseResponse
 from app.services.ai_service import AiService
 from app.services.subscription_service import SubscriptionService
+from sqlalchemy.dialects.postgresql import ARRAY, BIGINT
+from sqlalchemy import cast
 
 
 logging.basicConfig(
@@ -58,14 +60,41 @@ class ContentGenerationService:
             
             responses = session.query(CheckInResponsesInsights).filter(
                 CheckInResponsesInsights.project_id == project_id,
-                func.date(CheckInResponsesInsights.user_checkin_date).in_(check_dates)
+                func.date(CheckInResponsesInsights.checkin_date).in_(check_dates)
             ).all()
 
+            if len(responses) == 0:
+                return BaseResponse(
+                    statusCode=status.HTTP_404_NOT_FOUND,
+                    message="No responses found for the given dates.",
+                    data=None
+                )
+            
+            summaries = [r.summary for r in responses if len(r.summary) > 0]
+
+            if len(summaries) == 0:
+                return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="No responses found for the given dates.",
+                    data=None
+                )
+            
+            if len(summaries) == 1:
+                # If only one summary, return it directly
+                 return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="One response found which is not enough to generate content.",
+                    data=None
+                )
+            
             response_ids = [r.id for r in responses]
+
 
             previous_content = session.query(GeneratedContent).filter(
                 GeneratedContent.project_id == project_id,
-                GeneratedContent.checkin_response_ids.overlap(response_ids)
+                GeneratedContent.checkin_response_ids.contains(
+                    cast(response_ids, ARRAY(BIGINT))
+                )
             ).first()
 
             if previous_content:
@@ -113,6 +142,8 @@ class ContentGenerationService:
                 summaries=[response.summary for response in responses],
                 description=project.description
             )
+
+            
 
             saved_content = GeneratedContent(
                 content=content,

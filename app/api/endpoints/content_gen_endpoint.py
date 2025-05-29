@@ -11,8 +11,8 @@ from app.utils.logged_route import LoggedRoute
 
 
 router = APIRouter(
-    prefix="/content-gen",
-    tags=["content-gen"]
+    prefix="/content-generation",
+    tags=["content-generation"]
 )
 
 router.route_class = LoggedRoute
