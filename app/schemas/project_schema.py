@@ -53,3 +53,16 @@ class ProjectAnalyticsResponse(BaseModel):
 class ProjectDashboardResponse(BaseModel):
     analytics: ProjectAnalyticsResponse
     projects: list[ProjectResponse]
+
+class NewMemberRequest(BaseModel):
+    email: EmailStr
+    project_id: int
+
+class EnableDisableTeamMemberRequest(BaseModel):
+    member_id: int 
+    action: int
+    project_id: int
+
+class SendInvitationRequest(BaseModel):
+    member_id: int 
+    project_id: int

@@ -298,10 +298,13 @@ class UserService:
                     self.completed_user_profile_in_team_members(db_user.email, db, db_user.id)
                     res_access_token = create_access_token(db_user.id)
 
+                    subscriptionService = SubscriptionService()
+                    sub = subscriptionService.get_user_subscription(user.id, db)
+
                     return BaseResponse(
                             statusCode=status.HTTP_200_OK,
                             message="Login successful",
-                            data= { "user_id": db_user.id, "access_token": res_access_token }
+                            data= { "user_id": db_user.id, "access_token": res_access_token, "subscription": sub.data}
                         )
                 else:
                     if user.hashed_password:
@@ -319,7 +322,7 @@ class UserService:
                         return BaseResponse(
                             statusCode=status.HTTP_200_OK,
                             message="Login successful",
-                            data= { "user_id": user.id, "access_token": access_token }
+                            data= { "user_id": user.id, "access_token": access_token, "subscription": sub.data}
                         )
                 
             

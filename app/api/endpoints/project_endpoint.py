@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
-from app.schemas.project_schema import ProjectDashboardResponse, ProjectDetailsResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import  EnableDisableTeamMemberRequest, NewMemberRequest, ProjectDashboardResponse, ProjectDetailsResponse, ProjectRequest, ProjectResponse, SendInvitationRequest
 from app.schemas.response_schema import BaseResponse
 from app.services.project_service import ProjectService
 from fastapi.encoders import jsonable_encoder
@@ -69,5 +69,28 @@ def edit_project(request:ProjectRequest, project_id:int, payload:dict= Depends(J
     project_service = ProjectService()
     response = project_service.edit_project(project_request=request, user_id=user_id,  project_id=project_id)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
+
+@router.put("/member/status", response_model=BaseResponse[str])
+def edit_team_member_status(request: EnableDisableTeamMemberRequest, payload:dict=Depends(JWTBearer())):
+    user_id = payload.get("user_id")
+    project_service = ProjectService()
+    response = project_service.disable_member_from_project(user_id, request)
+    return JSONResponse(status_code=response.statusCode, content=response.dict())
+
+@router.post("/new-member", response_model=BaseResponse[str])
+def add_new_member(request: NewMemberRequest, payload:dict=Depends(JWTBearer())):
+    user_id = payload.get("user_id")
+    project_service = ProjectService()
+    response = project_service.add_new_member(user_id, request)
+    return JSONResponse(status_code=response.statusCode, content=response.dict())
+
+@router.post("/invite", response_model=BaseResponse[str])
+def send_invite_link(request:SendInvitationRequest, payload:dict=Depends(JWTBearer())):
+    user_id = payload.get("user_id")
+    project_service = ProjectService()
+    response = project_service.send_invitation_link(user_id, request)
+    return JSONResponse(status_code=response.statusCode, content=response.dict())
+
+
 
 

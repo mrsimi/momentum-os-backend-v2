@@ -12,7 +12,7 @@ from app.models.response_model import CheckInResponseModel
 from app.models.subscription_model import UserSubscriptionModel
 from app.models.user_model import UserModel
 from app.schemas.checkin_response_schema import CheckInResponse
-from app.schemas.project_schema import ProjectAnalyticsResponse, ProjectDashboardResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse
+from app.schemas.project_schema import EnableDisableTeamMemberRequest, NewMemberRequest, ProjectAnalyticsResponse, ProjectDashboardResponse, ProjectDetailsResponse, ProjectMemberResponse, ProjectRequest, ProjectResponse, SendInvitationRequest
 from app.schemas.response_schema import BaseResponse
 from app.services.subscription_service import SubscriptionService
 from app.utils.helpers import convert_utc_days_and_time
@@ -145,7 +145,7 @@ class ProjectService:
                     is_creator=False,
                     is_guest=False,
                     is_member=True,
-                    user_email=member.email
+                    user_email=member.email.lower().strip()
                 ) for member in members_already_user)
 
                 list_of_members.extend(ProjectMemberModel(
@@ -155,7 +155,7 @@ class ProjectService:
                     is_creator=False,
                     is_guest=True,
                     is_member=False,
-                    user_email=email
+                    user_email=email.lower().strip()
                 ) for email in members_not_users)
 
                 list_of_members.append(ProjectMemberModel(
@@ -165,7 +165,7 @@ class ProjectService:
                     is_creator=True,
                     is_guest=False,
                     is_member=True,
-                    user_email=user.email,
+                    user_email=user.email.lower().strip(),
                     has_accepted=True
                 ))
 
@@ -409,6 +409,24 @@ class ProjectService:
                     message="Project not found",
                     data=None
                 )
+            
+
+            subscription = SubscriptionService()
+            creator_user_sub = subscription.get_user_subscription(project.creator_user_id, db)
+            active_team_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == project_id, 
+                                                                      ProjectMemberModel.is_active == True,
+                                                                      ProjectMemberModel.is_creator == False).all()
+            
+            print(active_team_members)
+            print(creator_user_sub.data)
+            
+            if not self.can_add_members(creator_user_sub.data.plan_id, len(active_team_members)):
+                return BaseResponse(
+                    statusCode=status.HTTP_400_BAD_REQUEST,
+                    message="Cannot join project, User already exhausted number of active members. Contact Project owner to upgrade subscription",
+                    data=None
+                )
+
             project_member = db.query(ProjectMemberModel).filter(ProjectMemberModel.user_email == email).first()
             if not project_member:
                 return BaseResponse(
@@ -417,8 +435,10 @@ class ProjectService:
                     data=None
                 )
             
+            
             project_member.is_active = True
             project_member.has_accepted = True
+            project_member.has_rejected = False
             project_member.date_updated = datetime.now(timezone.utc)
             db.commit()
             return BaseResponse(
@@ -570,7 +590,6 @@ class ProjectService:
                         data=None
                     )
 
-
     #allow edit of name, description, start and end date and checkin time 
     def edit_project(self, project_request:ProjectRequest, user_id:int, project_id: int) -> BaseResponse[str]:
         try:
@@ -633,3 +652,205 @@ class ProjectService:
                         message="Error while trying to get project",
                         data=None
                     )
+    
+    def disable_member_from_project(self, user_id: int, request:EnableDisableTeamMemberRequest) -> BaseResponse[str]:
+        try:
+            with self.get_session() as db:
+                user_project = db.query(ProjectModel).filter(ProjectModel.id== request.project_id, 
+                                                             ProjectModel.is_active == True, 
+                                                             ProjectModel.creator_user_id == user_id).first()
+                if not user_project:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Project not found for user",
+                        data=None
+                    )
+                
+                member = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == request.project_id,
+                                                             ProjectMemberModel.id == request.member_id).first()
+                if not member:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Member not valid for this project",
+                        data=None
+                    )
+                
+                #1- disable, 2 - enable
+                if request.action == 1:
+                    member.is_active = False
+                    member.date_updated = datetime.now(timezone.utc)
+                elif request.action == 2:
+                    active_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == request.project_id,
+                                                                   ProjectMemberModel.is_active == True,
+                                                                   ProjectMemberModel.is_creator == False).all()
+                    creator_subscription = SubscriptionService().get_user_subscription(user_id, db)
+                    if not self.can_add_members(creator_subscription.data.plan_id, len(active_members)):
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message=f"Cannot have more than {len(active_members)} active members for your current plan. Kindly upgrade or contact administrator",
+                            data=None
+                        )
+
+                    member.is_active = True
+                    member.date_updated = datetime.now(timezone.utc)
+
+                db.commit()
+
+                return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Team member status successfully updated",
+                        data=None
+                    )
+        except Exception as e:
+            logging.info(f'Error remove_member_from_project response {e}')
+            return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Error while update team member status",
+                        data=None
+                    )
+        
+    def add_new_member(self, user_id:int, request:NewMemberRequest) -> BaseResponse[str]:
+        try:
+            with self.get_session() as db:
+                creator = db.query(UserModel).filter(UserModel.id == user_id).first()
+                if not creator:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Not a valid user",
+                        data=None
+                    )
+                
+                if creator.email == request.email.lower().strip():
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Cannot add project creator again",
+                        data=None
+                    )
+                project = db.query(ProjectModel).filter(ProjectModel.creator_user_id == user_id, 
+                                                        ProjectModel.id == request.project_id, 
+                                                        ProjectModel.is_active == True).first()
+                if not project:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Active project not found",
+                        data=None
+                    )
+                
+                team_member_with_email = db.query(ProjectMemberModel).filter(ProjectMemberModel.user_email == 
+                                                                             request.email.lower().strip()).first()
+                if team_member_with_email:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="User with email already part of team",
+                        data=None
+                    )
+
+                team_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == project.id,
+                                                                   ProjectMemberModel.is_active == True,
+                                                                   ProjectMemberModel.is_creator == False).all()
+                
+                
+                if team_members:
+                    subscription  = SubscriptionService()
+                    user_sub = subscription.get_user_subscription(user_id, db)
+
+                    if not self.can_add_members(user_sub.data.plan_id, len(team_members)):
+                        return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message=f"Cannot add more than {len(team_members)} active members for your current plan. Kindly upgrade or contact administrator",
+                            data=None
+                        )
+                
+                
+                member_user = db.query(UserModel).filter(UserModel.email == request.email.lower().strip()).first()
+                member = ProjectMemberModel(
+                            project_id=project.id,
+                            user_id=member_user.id if member_user else None,
+                            is_active=False,
+                            is_creator=False,
+                            is_guest=not member_user,
+                            is_member=bool(member_user),
+                            user_email=request.email
+                        )
+
+                db.add(member)
+                db.commit()
+
+                #send email to all members who are not users.
+                self.send_emails_to_members([request.email]
+                                            , project.title, project.id, creator.email)
+                
+                return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Member added and Email has been sent",
+                        data=None
+                    )
+
+
+
+        except Exception as e:
+            logging.info(f'Error add_new_member response {e}')
+            return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Error while trying to add member to project",
+                        data=None
+                    ) 
+    
+    def can_add_members(self, subcription_plan, current_members_count):
+        if subcription_plan == 0 and current_members_count >= 3:
+            return False
+        elif subcription_plan == 1 and current_members_count >= 10:
+            return False
+        return True
+    
+    def send_invitation_link(self, user_id:int, request:SendInvitationRequest) -> BaseResponse[str]:
+        try:
+            with self.get_session() as db:
+                project = db.query(ProjectModel).filter(ProjectModel.id == request.project_id, 
+                                                        ProjectModel.creator_user_id == user_id).first()
+                if not project:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Project not found",
+                        data=None
+                    )
+                
+                active_members = db.query(ProjectMemberModel).filter(ProjectMemberModel.project_id == request.project_id,
+                                                                   ProjectMemberModel.is_active == True,
+                                                                   ProjectMemberModel.is_creator == False).all()
+                
+                creator_subscription = SubscriptionService().get_user_subscription(user_id, db)
+                if not self.can_add_members(creator_subscription.data.plan_id, len(active_members)):
+                    return BaseResponse(
+                            statusCode=status.HTTP_400_BAD_REQUEST,
+                            message=f"Cannot have more than {len(active_members)} active members for your current plan. Kindly upgrade or contact administrator",
+                            data=None
+                        )
+                
+                creator = db.query(UserModel).filter(UserModel.id == user_id).first()
+                member_user = db.query(ProjectMemberModel).filter(ProjectMemberModel.id == request.member_id).first()
+                if member_user.is_active:
+                    return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Member is already an active participant in the project",
+                        data=None
+                    )
+                
+                self.send_emails_to_members([member_user.user_email]
+                                            , project.title, project.id, creator.email)
+                
+                return BaseResponse(
+                        statusCode=status.HTTP_200_OK,
+                        message="Invitation link sent again",
+                        data=None
+                    )
+                
+
+
+        except Exception as e:
+            logging.info(f'Error send_invitation_link response {e}')
+            return BaseResponse(
+                        statusCode=status.HTTP_400_BAD_REQUEST,
+                        message="Error while trying to add member to project",
+                        data=None
+                    ) 
