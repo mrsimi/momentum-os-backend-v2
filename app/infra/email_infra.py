@@ -35,7 +35,7 @@ class EmailInfra:
         
         full_content = container_html.replace("{{content}}", html)
         params = {
-            "from": "Syncrora <home@turntablecharts.com>",
+            "from": "DoTellBoard <home@turntablecharts.com>",
             "to": destinationEmail,
             "subject": subject,
             "html": full_content
