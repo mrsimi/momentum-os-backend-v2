@@ -18,7 +18,7 @@ async def register(request: RegisterRequest):
     response = user_service.register(request)
     return JSONResponse(status_code=response.statusCode, content=response.dict())
 
-@router.get("/test", response_model=BaseResponse[str])
+@router.get("/test-again", response_model=BaseResponse[str])
 async def test():
     return JSONResponse(status_code=200, content={"message": "Test endpoint is working!"})
 
