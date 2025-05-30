@@ -257,7 +257,7 @@ class UserService:
         try:
             with httpx.Client() as client:
                 response = client.get(
-                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    "https://www.googleapis.com/oauth1/v3/userinfo",
                     headers={"Authorization": f"Bearer {request.token}"}
                 )
 
