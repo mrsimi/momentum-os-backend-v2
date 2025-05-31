@@ -66,7 +66,7 @@ async def fetch_checkins_and_notify():
             tracker_result = await conn.fetch(tracker_query, user_datetime, checkin_id)
 
             if len(tracker_result) > 0:
-                logging.info(f'-- sent updates to the user already tracker_id: {json.json.dumps(tracker_result,indent=1)}')
+                logging.info(f'-- sent updates to the user already tracker_id: {json.dumps(tracker_result,indent=1)}')
 
             members_query = """
             SELECT user_email
