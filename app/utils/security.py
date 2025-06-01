@@ -87,7 +87,7 @@ def decrypt_encrypted_user_id(encrypted_user_id: str) -> int:
 
 #create access token to expire in 24 hours
 def create_access_token(user_id: int) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(hours=48)
+    expire = datetime.now(timezone.utc) + timedelta(hours=72)
     payload = {
         'user_id': user_id,
         'exp': expire
